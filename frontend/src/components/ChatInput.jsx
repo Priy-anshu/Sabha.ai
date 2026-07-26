@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Paperclip, Send, FileText, X } from 'lucide-react';
+import { Paperclip, Send, Square, FileText, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function ChatInput({
@@ -9,6 +9,7 @@ export default function ChatInput({
   setAttachedFile,
   loading,
   onSend,
+  onStop,
   onOpenAuthModal
 }) {
   const { user } = useAuth();
@@ -56,8 +57,9 @@ export default function ChatInput({
         <button
           className="attach-btn"
           onClick={handlePaperclipClick}
+          disabled={loading}
           title={user ? "Attach PDF or document to Sabha.ai" : "Sign In to attach documents"}
-          style={{ background: 'transparent', border: 'none', color: attachedFile ? '#38bdf8' : '#94a3b8', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center' }}
+          style={{ background: 'transparent', border: 'none', color: attachedFile ? '#38bdf8' : '#94a3b8', cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center' }}
         >
           <Paperclip size={20} />
         </button>
@@ -68,11 +70,25 @@ export default function ChatInput({
           placeholder={attachedFile ? "Ask Sabha.ai Council about this document..." : "Ask Sabha.ai Council anything..."}
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && onSend()}
+          onKeyDown={e => e.key === 'Enter' && !loading && onSend()}
+          disabled={loading}
         />
-        <button className="send-btn" onClick={onSend} disabled={loading}>
-          <Send size={18} />
-        </button>
+
+        {/* ChatGPT Style Stop Generating vs Send Button */}
+        {loading ? (
+          <button
+            className="send-btn stop-btn"
+            onClick={onStop}
+            title="Stop generating"
+            style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+          >
+            <Square size={16} fill="white" />
+          </button>
+        ) : (
+          <button className="send-btn" onClick={onSend} disabled={!input.trim() && !attachedFile}>
+            <Send size={18} />
+          </button>
+        )}
       </div>
     </>
   );

@@ -1,6 +1,6 @@
 import { fetchWithAuth } from './apiConfig.js';
 
-export async function sendDebatePrompt({ prompt, file, existingPersonas, sessionId }) {
+export async function sendDebatePrompt({ prompt, file, existingPersonas, sessionId, signal }) {
   const formData = new FormData();
   formData.append('prompt', prompt || '');
 
@@ -18,7 +18,8 @@ export async function sendDebatePrompt({ prompt, file, existingPersonas, session
 
   const res = await fetchWithAuth('/api/chat/debate', {
     method: 'POST',
-    body: formData
+    body: formData,
+    signal
   });
 
   return res.json();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar.jsx';
 import ChatHeader from './components/ChatHeader.jsx';
 import ChatMessages from './components/ChatMessages.jsx';
@@ -30,7 +30,9 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
 
-  // Fetch sidebar sessions list (only for authenticated users)
+  // Ref for AbortController to support Stop Generating
+  const abortControllerRef = useRef(null);
+
   const fetchSessionsList = async () => {
     if (!user) return;
     try {
@@ -48,11 +50,15 @@ export default function App() {
   }, [user, token]);
 
   const handleNewChat = () => {
+    if (loading && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     const newId = 'sess_' + Date.now();
     setSessionId(newId);
     setMessages([]);
     setActivePersonas([]);
     setAttachedFile(null);
+    setLoading(false);
   };
 
   const handleSelectSession = async (sId) => {
@@ -81,6 +87,19 @@ export default function App() {
     }
   };
 
+  // Stop Generation Handler
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoading(false);
+    setMessages(prev => [
+      ...prev,
+      { id: String(Date.now() + 1), sender: 'ai', text: '⏹️ Generation stopped by user.', personas: activePersonas }
+    ]);
+  };
+
   const handleSend = async () => {
     if ((!input.trim() && !attachedFile) || loading) return;
 
@@ -98,12 +117,17 @@ export default function App() {
     setAttachedFile(null);
     setLoading(true);
 
+    // Create new AbortController instance
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const debateData = await sendDebatePrompt({
         prompt: currentInput,
         file: currentFile,
         existingPersonas: activePersonas,
-        sessionId
+        sessionId,
+        signal: controller.signal
       });
 
       if (debateData.success) {
@@ -119,7 +143,6 @@ export default function App() {
         const finalMessages = [...updatedMessages, aiMsg];
         setMessages(finalMessages);
 
-        // Save session history to MongoDB Atlas if user is authenticated
         if (user) {
           await saveSession({
             sessionId,
@@ -135,18 +158,23 @@ export default function App() {
         ]);
       }
     } catch (err) {
-      setMessages(prev => [
-        ...prev,
-        { id: String(Date.now() + 1), sender: 'ai', text: 'Failed to connect to Sabha.ai backend debate service.' }
-      ]);
+      if (err.name === 'AbortError') {
+        console.log('Generation request cleanly aborted by user.');
+      } else {
+        setMessages(prev => [
+          ...prev,
+          { id: String(Date.now() + 1), sender: 'ai', text: 'Failed to connect to Sabha.ai backend debate service.' }
+        ]);
+      }
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
   return (
     <div className="app-container">
-      {/* Sidebar Component (Only rendered for logged-in users) */}
+      {/* Sidebar Component */}
       {user && (
         <Sidebar
           sessions={sessions}
@@ -175,6 +203,7 @@ export default function App() {
           setAttachedFile={setAttachedFile}
           loading={loading}
           onSend={handleSend}
+          onStop={handleStop}
           onOpenAuthModal={() => setShowAuthModal(true)}
         />
       </div>
