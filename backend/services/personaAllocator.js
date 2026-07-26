@@ -4,6 +4,7 @@ import { callLLM } from './llmProvider.js';
  * Checks if a user prompt is casual conversation or simple general chat.
  */
 function isCasualConversation(prompt) {
+  if (!prompt || typeof prompt !== 'string') return false;
   const clean = prompt.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
 
   const casualPhrases = [
@@ -23,6 +24,7 @@ function isCasualConversation(prompt) {
  * Detects if a prompt is creative or technical to scale temperature accordingly.
  */
 function detectTemperature(prompt) {
+  if (!prompt || typeof prompt !== 'string') return 0.3;
   const creativeKeywords = ['story', 'poem', 'script', 'creative', 'brainstorm', 'novel', 'plot', 'character', 'song', 'essay'];
   const isCreative = creativeKeywords.some(kw => prompt.toLowerCase().includes(kw));
   return isCreative ? 0.95 : 0.3;
@@ -45,23 +47,38 @@ function getRandomIndianName(usedNames = []) {
 /**
  * Step A: Dynamic Persona Allocator Agent (with Session Persona Lock & Intent Routing)
  */
-export async function allocatePersonas(userPrompt, existingPersonas = [], provider = 'gemini') {
+export async function allocatePersonas(inputParam, existingPersonasParam = [], providerParam = 'gemini') {
+  let userPrompt = '';
+  let existingPersonas = [];
+  let provider = 'gemini';
+
+  if (typeof inputParam === 'object' && inputParam !== null) {
+    userPrompt = inputParam.prompt || inputParam.userPrompt || '';
+    existingPersonas = inputParam.existingPersonas || [];
+    provider = inputParam.provider || 'gemini';
+  } else {
+    userPrompt = String(inputParam || '');
+    existingPersonas = existingPersonasParam || [];
+    provider = providerParam || 'gemini';
+  }
+
   // 1. CASUAL CONVERSATION BYPASS: Re-use existing persona if available!
   if (isCasualConversation(userPrompt)) {
     if (existingPersonas && existingPersonas.length > 0) {
-      // Re-use the existing persona from the session!
-      return existingPersonas;
+      return { personas: existingPersonas, count: existingPersonas.length, temperature: 0.7 };
     }
 
     const greetingName = getRandomIndianName();
-    return [
+    const casualPersonas = [
       {
         id: 'communicator',
         name: `${greetingName} (Friendly Assistant)`,
-        role: 'Handles casual conversation and general assistance.',
-        mindset: 'Respond simply, warmly, and concisely. Do NOT generate complex technical debate.'
+        role: 'Friendly Assistant',
+        mindset: 'Respond warmly, clearly, and concisely in 1-2 sentences without technical jargon.'
       }
     ];
+
+    return { personas: casualPersonas, count: 1, temperature: 0.7 };
   }
 
   // 2. DOMAIN / TECHNICAL QUERY: If existing team fits topic, re-use it. Otherwise allocate/adapt personas.
@@ -108,16 +125,16 @@ JSON SCHEMA REQUIREMENT:
     if (!Array.isArray(personas) || personas.length === 0) {
       throw new Error('Invalid persona array returned from LLM');
     }
-    return personas;
+    return { personas, count: personas.length, temperature };
   } catch (err) {
     console.warn('Falling back to default Indian personas:', err.message);
-    if (existingPersonas.length > 0) return existingPersonas;
+    if (existingPersonas.length > 0) return { personas: existingPersonas, count: existingPersonas.length, temperature };
 
     const n1 = getRandomIndianName();
     const n2 = getRandomIndianName([n1]);
     const n3 = getRandomIndianName([n1, n2]);
 
-    return [
+    const defaultPersonas = [
       {
         id: 'tech_lead',
         name: `${n1} (Technical Lead)`,
@@ -137,5 +154,7 @@ JSON SCHEMA REQUIREMENT:
         mindset: 'Critique previous proposals for security holes and privacy flaws.'
       }
     ];
+
+    return { personas: defaultPersonas, count: 3, temperature };
   }
 }

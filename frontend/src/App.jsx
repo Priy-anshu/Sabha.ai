@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { MessageSquare, Plus, Send, Bot, Users, ShieldAlert, Sparkles, X, Eye, Copy, Check, MessageCircle, ShieldCheck, Trash2, LogIn, LogOut, User as UserIcon, Lock, Mail, KeyRound } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { MessageSquare, Plus, Send, Bot, Users, ShieldAlert, Sparkles, X, Eye, Copy, Check, MessageCircle, ShieldCheck, Trash2, LogIn, LogOut, User as UserIcon, Lock, Mail, KeyRound, Paperclip, FileText } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 
@@ -10,7 +10,7 @@ export default function App() {
     {
       id: 1,
       sender: 'ai',
-      text: 'Har Har Mahadev! Real Email Verification (OTP via Nodemailer) & Google Auth are active. Click Sign In at the bottom left!',
+      text: 'Har Har Mahadev! Phase 6 Multimodal RAG Document Q&A is active. Click the Paperclip icon to attach PDFs or text documents!',
       personas: [],
       transcript: [],
       verification: null
@@ -18,9 +18,11 @@ export default function App() {
   ]);
   const [activePersonas, setActivePersonas] = useState([]);
   const [input, setInput] = useState('');
+  const [attachedFile, setAttachedFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [modalData, setModalData] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Authentication State
   const [user, setUser] = useState(() => {
@@ -29,14 +31,13 @@ export default function App() {
   });
   const [token, setToken] = useState(() => localStorage.getItem('token') || '');
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login', 'register', or 'otp'
+  const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
   const [otpInput, setOtpInput] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
   const [authError, setAuthError] = useState('');
   const [authSuccessMsg, setAuthSuccessMsg] = useState('');
 
-  // Fetch session history list for sidebar
   const fetchSessions = async () => {
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -59,6 +60,7 @@ export default function App() {
     setSessionId(newId);
     setMessages([]);
     setActivePersonas([]);
+    setAttachedFile(null);
   };
 
   const handleSelectSession = async (sId) => {
@@ -94,6 +96,13 @@ export default function App() {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAttachedFile(file);
+    }
   };
 
   // Auth Handlers
@@ -132,7 +141,6 @@ export default function App() {
     }
   };
 
-  // Handle OTP Verification Submit
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -162,7 +170,6 @@ export default function App() {
     }
   };
 
-  // Real Google OAuth Success Handler
   const handleGoogleSuccess = async (credentialResponse) => {
     setAuthError('');
     try {
@@ -206,25 +213,38 @@ export default function App() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || loading) return;
+    if ((!input.trim() && !attachedFile) || loading) return;
 
-    const userMsg = { id: String(Date.now()), sender: 'user', text: input };
+    const userText = attachedFile
+      ? `📎 [Attached: ${attachedFile.name}] ${input}`
+      : input;
+
+    const userMsg = { id: String(Date.now()), sender: 'user', text: userText };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
+
     const currentInput = input;
+    const currentFile = attachedFile;
     setInput('');
+    setAttachedFile(null);
     setLoading(true);
 
     try {
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      };
+      const formData = new FormData();
+      formData.append('prompt', currentInput);
+      if (currentFile) {
+        formData.append('file', currentFile);
+      }
+      if (activePersonas.length > 0) {
+        formData.append('existingPersonas', JSON.stringify(activePersonas));
+      }
+
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const debateRes = await fetch('/api/chat/debate', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ prompt: currentInput, existingPersonas: activePersonas })
+        body: formData
       });
       const debateData = await debateRes.json();
 
@@ -244,7 +264,10 @@ export default function App() {
         // Save to MongoDB
         await fetch('/api/sessions/save', {
           method: 'POST',
-          headers,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
           body: JSON.stringify({
             sessionId,
             activePersonas: debateData.personas,
@@ -335,7 +358,7 @@ export default function App() {
       {/* Main Chat Area */}
       <div className="main-chat-area">
         <div className="chat-header">
-          <span className="chat-title">Multi-Agent AI Debate System</span>
+          <span className="chat-title">Multi-Agent AI Debate System — Phase 6 Multimodal RAG</span>
           {user && <span style={{ fontSize: '0.85rem', color: '#38bdf8' }}>Logged in as {user.name}</span>}
         </div>
 
@@ -385,17 +408,47 @@ export default function App() {
             <div className="message-bubble ai-message">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontStyle: 'italic' }}>
                 <Sparkles size={16} className="spin-icon" color="#38bdf8" />
-                Allocating personas, debating & running Dual Verifier Audit...
+                Processing RAG context, debating & running Dual Verifier Audit...
               </div>
             </div>
           )}
         </div>
 
+        {/* File Attachment Chip */}
+        {attachedFile && (
+          <div style={{ padding: '0 1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8', padding: '0.3rem 0.6rem', borderRadius: '8px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FileText size={14} />
+              <span>{attachedFile.name}</span>
+              <button onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="input-area">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".pdf,.txt,.md,.json"
+            style={{ display: 'none' }}
+          />
+
+          <button
+            className="attach-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach PDF or document"
+            style={{ background: 'transparent', border: 'none', color: attachedFile ? '#38bdf8' : '#94a3b8', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center' }}
+          >
+            <Paperclip size={20} />
+          </button>
+
           <input
             type="text"
             className="chat-input"
-            placeholder="Type your message or prompt here..."
+            placeholder={attachedFile ? "Ask a question about this document..." : "Type your message or prompt here..."}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
@@ -424,7 +477,6 @@ export default function App() {
               {authSuccessMsg && <div style={{ background: 'rgba(74, 222, 128, 0.15)', border: '1px solid rgba(74, 222, 128, 0.4)', color: '#4ade80', padding: '0.6rem', borderRadius: '6px', fontSize: '0.85rem' }}>{authSuccessMsg}</div>}
 
               {authMode === 'otp' ? (
-                /* OTP Verification Screen */
                 <form onSubmit={handleOtpSubmit} className="auth-form">
                   <p style={{ fontSize: '0.88rem', color: '#cbd5e1', marginBottom: '0.5rem' }}>
                     Enter the 6-digit code sent to <strong>{pendingEmail}</strong>:
@@ -456,7 +508,6 @@ export default function App() {
                   </div>
                 </form>
               ) : (
-                /* Standard Login / Register Screen */
                 <>
                   <div style={{ display: 'flex', justifyContent: 'center', margin: '0.5rem 0' }}>
                     <GoogleLogin

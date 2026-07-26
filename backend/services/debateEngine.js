@@ -1,88 +1,95 @@
 import { callLLM } from './llmProvider.js';
 
 /**
- * Step B: Sequential Adversarial Debate Engine
- * Executes a sequential multi-turn debate loop across allocated personas.
+ * Step B: Sequential Adversarial Debate Loop with RAG Document Context Support
  */
-export async function runDebate({ userPrompt, personas, provider = 'gemini' }) {
+export async function runDebate({ userPrompt, personas, provider = 'gemini', documentContext = '' }) {
   if (!personas || personas.length === 0) {
-    throw new Error('No personas provided for debate execution');
+    throw new Error('No personas provided for debate');
   }
 
-  // 1. Single Persona Bypass (Casual Conversation / Simple Chat)
+  // Build Document Augmented Prompt
+  const contextAugmentedPrompt = documentContext
+    ? `[ATTACHED DOCUMENT CONTEXT (Full Content)]:\n${documentContext}\n\n[USER QUESTION]:\n${userPrompt}`
+    : userPrompt;
+
+  // Handle single-persona casual chat bypass
   if (personas.length === 1) {
     const singlePersona = personas[0];
-    const response = await callLLM({
-      prompt: userPrompt,
-      systemInstruction: `You are ${singlePersona.name}. Role: ${singlePersona.role}.
-CRITICAL INSTRUCTION: Respond simply, warmly, and concisely in 1-2 natural sentences. Do NOT generate complex technical analysis, debate, or bullet points for simple casual conversation.`,
+    const systemPrompt = `You are ${singlePersona.name}, acting in the role of ${singlePersona.role}.
+Mindset: ${singlePersona.mindset}.
+Use any attached document context if provided to answer the user warmly and accurately.`;
+
+    const singleResponse = await callLLM({
+      prompt: contextAugmentedPrompt,
+      systemInstruction: systemPrompt,
       provider,
       temperature: 0.7
     });
 
     return {
-      consensus: response,
-      transcript: [
-        {
-          personaName: singlePersona.name,
-          role: singlePersona.role,
-          output: response
-        }
-      ]
+      consensus: singleResponse,
+      transcript: [{ personaName: singlePersona.name, role: singlePersona.role, output: singleResponse }]
     };
   }
 
-  // 2. Sequential Multi-Turn Debate Loop (Only for Domain/Technical Queries)
-  const debateTranscript = [];
-  let accumulatedContext = '';
+  const transcript = [];
+  let currentProposal = '';
 
-  for (let i = 0; i < personas.length; i++) {
+  // Step 2: Persona 1 proposes initial solution
+  const persona1 = personas[0];
+  const p1Instruction = `You are ${persona1.name} (${persona1.role}).
+Mindset: ${persona1.mindset}.
+Analyze the user request and the attached document context (if provided) and propose your initial technical/analytical solution.`;
+
+  currentProposal = await callLLM({
+    prompt: contextAugmentedPrompt,
+    systemInstruction: p1Instruction,
+    provider,
+    temperature: 0.4
+  });
+
+  transcript.push({
+    personaName: persona1.name,
+    role: persona1.role,
+    output: currentProposal
+  });
+
+  // Step 3: Sequential debate loop across remaining personas
+  for (let i = 1; i < personas.length; i++) {
     const p = personas[i];
-    const isFirst = i === 0;
+    const critiqueInstruction = `You are ${p.name} (${p.role}).
+Mindset: ${p.mindset}.
+Review the user query, attached document context, and previous solution. Critique the previous solution for flaws, security issues, performance bottlenecks, or unhandled edge cases. Present your refined version.`;
 
-    const personaInstruction = `You are ${p.name}. Role: ${p.role}.
-CRITICAL INSTRUCTION: ${p.mindset}
-Assume previous outputs may contain mistakes, missed edge cases, or over-engineering. Point out flaws constructively and offer concrete improvements.`;
-
-    const userContextPrompt = isFirst
-      ? `User Question: "${userPrompt}"\n\nProvide your initial specialized solution.`
-      : `User Question: "${userPrompt}"\n\nPrevious Debate Transcript:\n${accumulatedContext}\n\nCritique the previous proposals for errors or missed facts, and provide your improved, refined proposal.`;
-
-    console.log(`💬 Running Debate Round ${i + 1}/${personas.length} with Persona: ${p.name}...`);
-
-    const personaOutput = await callLLM({
-      prompt: userContextPrompt,
-      systemInstruction: personaInstruction,
+    const nextOutput = await callLLM({
+      prompt: `${contextAugmentedPrompt}\n\nPrevious Solution by ${personas[i - 1].name}:\n${currentProposal}\n\nProvide your critique and refined proposal:`,
+      systemInstruction: critiqueInstruction,
       provider,
-      temperature: 0.5
+      temperature: 0.4
     });
 
-    debateTranscript.push({
-      personaId: p.id,
+    currentProposal = nextOutput;
+    transcript.push({
       personaName: p.name,
       role: p.role,
-      output: personaOutput
+      output: nextOutput
     });
-
-    accumulatedContext += `\n--- [${p.name}'s Contribution] ---\n${personaOutput}\n`;
   }
 
-  // 3. Final Consensus Synthesizer Step
-  console.log(`🤝 Synthesizing Debate Consensus across ${personas.length} personas...`);
-  const synthesisInstruction = `You are the Lead Master Synthesizer.
-Your job is to read a multi-persona debate transcript and unify all valid critiques, security checks, and improvements into a single, cohesive, authoritative answer for the user.
-
-Do NOT mention persona names like "Rohan said" or "Priya pointed out". Present the final result cleanly and comprehensively.`;
+  // Step 4: Final Master Synthesizer Agent
+  const synthesizerInstruction = `You are the Lead Synthesis Master Agent.
+Synthesize all persona proposals, critiques, and attached document context into a unified, flawless, well-structured final answer. Do NOT mention verifier names in the output.`;
 
   const finalConsensus = await callLLM({
-    prompt: `User Question: "${userPrompt}"\n\nComplete Multi-Agent Debate Transcript:\n${accumulatedContext}\n\nSynthesize the final authoritative answer:`,
-    systemInstruction: synthesisInstruction,
+    prompt: `${contextAugmentedPrompt}\n\nDebate Transcript:\n${transcript.map(t => `${t.personaName}: ${t.output}`).join('\n\n')}\n\nSynthesize the final answer:`,
+    systemInstruction: synthesizerInstruction,
     provider,
     temperature: 0.3
   });
 
   return {
     consensus: finalConsensus,
-    transcript: debateTranscript
+    transcript
   };
 }
