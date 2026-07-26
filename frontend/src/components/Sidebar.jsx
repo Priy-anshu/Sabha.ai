@@ -1,10 +1,12 @@
 import React from 'react';
-import { Bot, Plus, MessageSquare, Trash2, LogIn, LogOut } from 'lucide-react';
+import { Bot, Plus, MessageSquare, Trash2, LogIn, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Sidebar({
   sessions,
   sessionId,
+  theme,
+  onToggleTheme,
   onNewChat,
   onSelectSession,
   onDeleteSession,
@@ -58,8 +60,17 @@ export default function Sidebar({
         ))}
       </div>
 
-      {/* Bottom Left User Account Pill */}
+      {/* Bottom Sidebar Settings & User Account Pill */}
       <div className="user-sidebar-bottom">
+        {/* Theme Toggle Button */}
+        <button className="theme-toggle-btn" onClick={onToggleTheme}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {theme === 'dark' ? <Moon size={16} color="#38bdf8" /> : <Sun size={16} color="#f59e0b" />}
+            <span>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
+          </div>
+          <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Toggle</span>
+        </button>
+
         {user ? (
           <div className="user-profile-pill">
             <div className="user-avatar-initials">{getInitials(user.name)}</div>

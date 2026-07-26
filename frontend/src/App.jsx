@@ -21,6 +21,27 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
 
+  // Theme State: Default 'light' for guest users, saved preference for logged-in users
+  const [theme, setTheme] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    if (!savedUser) return 'light';
+    return localStorage.getItem('theme') || 'dark';
+  });
+
+  // Apply theme to <html> element
+  useEffect(() => {
+    if (!user) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+    }
+  }, [user, theme]);
+
+  const handleToggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   const abortControllerRef = useRef(null);
 
   const fetchSessionsList = async () => {
@@ -170,6 +191,8 @@ export default function App() {
         <Sidebar
           sessions={sessions}
           sessionId={sessionId}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
           onNewChat={handleNewChat}
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
