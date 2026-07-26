@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { callLLM } from './services/llmProvider.js';
 import { allocatePersonas } from './services/personaAllocator.js';
+import { runDebate } from './services/debateEngine.js';
 import { connectDB } from './config/db.js';
 
 dotenv.config();
@@ -70,6 +71,41 @@ app.post('/api/chat/allocate-personas', async (req, res) => {
     });
   } catch (error) {
     console.error('Persona Allocator Error:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Phase 3 Route: Step B - Full Multi-Agent Debate Loop
+app.post('/api/chat/debate', async (req, res) => {
+  try {
+    const { prompt, existingPersonas, provider } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    // Step A: Dynamically allocate/prune personas
+    const personas = await allocatePersonas(prompt, existingPersonas, provider);
+
+    // Step B: Run Sequential Adversarial Debate across allocated personas
+    const debateResult = await runDebate({
+      userPrompt: prompt,
+      personas,
+      provider
+    });
+
+    return res.json({
+      success: true,
+      prompt,
+      count: personas.length,
+      personas,
+      response: debateResult.consensus,
+      transcript: debateResult.transcript
+    });
+  } catch (error) {
+    console.error('Debate Engine Error:', error.message);
     return res.status(500).json({
       success: false,
       error: error.message

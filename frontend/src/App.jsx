@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
-import { MessageSquare, Plus, Send, Bot, Users, ShieldAlert, Sparkles, X, Eye, Copy, Check } from 'lucide-react';
+import { MessageSquare, Plus, Send, Bot, Users, ShieldAlert, Sparkles, X, Eye, Copy, Check, MessageCircle } from 'lucide-react';
 
 export default function App() {
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: 'ai',
-      text: 'Har Har Mahadev! Welcome to the Multi-Agent Debate Platform. Type any prompt to test persona allocation & response generation.',
-      personas: []
+      text: 'Har Har Mahadev! Step B (Sequential Adversarial Debate Loop) is active. Type any question to launch a multi-persona debate!',
+      personas: [],
+      transcript: []
     }
   ]);
   const [activePersonas, setActivePersonas] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [modalPersonas, setModalPersonas] = useState(null);
+  const [modalData, setModalData] = useState(null); // { personas, transcript }
   const [copiedId, setCopiedId] = useState(null);
 
   const handleNewChat = () => {
@@ -37,44 +38,36 @@ export default function App() {
     setLoading(true);
 
     try {
-      // 1. Allocate / Adapt Personas
-      const personaRes = await fetch('/api/chat/allocate-personas', {
+      // Execute Step A Allocation + Step B Multi-Turn Debate Loop
+      const debateRes = await fetch('/api/chat/debate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: currentInput, existingPersonas: activePersonas })
       });
-      const personaData = await personaRes.json();
-      const updatedPersonas = personaData.personas || activePersonas;
-      setActivePersonas(updatedPersonas);
+      const debateData = await debateRes.json();
 
-      // 2. Fetch AI Response
-      const chatRes = await fetch('/api/chat/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: currentInput })
-      });
-      const chatData = await chatRes.json();
-
-      if (chatData.success) {
+      if (debateData.success) {
+        setActivePersonas(debateData.personas);
         setMessages(prev => [
           ...prev,
           {
             id: Date.now() + 1,
             sender: 'ai',
-            text: chatData.response,
-            personas: updatedPersonas
+            text: debateData.response,
+            personas: debateData.personas,
+            transcript: debateData.transcript
           }
         ]);
       } else {
         setMessages(prev => [
           ...prev,
-          { id: Date.now() + 1, sender: 'ai', text: `Error: ${chatData.error}`, personas: updatedPersonas }
+          { id: Date.now() + 1, sender: 'ai', text: `Error: ${debateData.error}`, personas: activePersonas }
         ]);
       }
     } catch (err) {
       setMessages(prev => [
         ...prev,
-        { id: Date.now() + 1, sender: 'ai', text: 'Failed to connect to backend service.' }
+        { id: Date.now() + 1, sender: 'ai', text: 'Failed to connect to backend debate service.' }
       ]);
     } finally {
       setLoading(false);
@@ -104,7 +97,7 @@ export default function App() {
       {/* Main Chat Area */}
       <div className="main-chat-area">
         <div className="chat-header">
-          <span className="chat-title">Multi-Agent AI Debate System</span>
+          <span className="chat-title">Multi-Agent AI Debate System — Phase 3 Debate Engine</span>
         </div>
 
         <div className="messages-container">
@@ -114,17 +107,17 @@ export default function App() {
               className={`message-bubble ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}
             >
               <div className="message-sender-header">
-                <span>{msg.sender === 'user' ? 'You' : 'AI Multi-Agent Team'}</span>
+                <span>{msg.sender === 'user' ? 'You' : 'AI Multi-Agent Debate Team'}</span>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {/* Clickable Persona Pop-Up Badge */}
+                  {/* Clickable Persona & Transcript Pop-Up Badge */}
                   {msg.sender === 'ai' && msg.personas && msg.personas.length > 0 && (
                     <button
                       className="view-personas-badge-btn"
-                      onClick={() => setModalPersonas(msg.personas)}
+                      onClick={() => setModalData({ personas: msg.personas, transcript: msg.transcript })}
                     >
                       <Users size={14} color="#38bdf8" />
-                      <span>View {msg.personas.length} Allocated Personas</span>
+                      <span>Inspect {msg.personas.length} Personas & Debate</span>
                       <Eye size={12} style={{ marginLeft: '2px' }} />
                     </button>
                   )}
@@ -148,7 +141,7 @@ export default function App() {
             <div className="message-bubble ai-message">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontStyle: 'italic' }}>
                 <Sparkles size={16} className="spin-icon" color="#38bdf8" />
-                Allocating Indian expert personas & generating response...
+                Allocating expert personas & running sequential debate loop...
               </div>
             </div>
           )}
@@ -158,7 +151,7 @@ export default function App() {
           <input
             type="text"
             className="chat-input"
-            placeholder="Type your message or prompt here..."
+            placeholder="Type any prompt (e.g. 'Which tech stack is best for a real-time card game?')..."
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
@@ -169,22 +162,23 @@ export default function App() {
         </div>
       </div>
 
-      {/* Pop-Up Modal Window for Persona Inspection */}
-      {modalPersonas && (
-        <div className="modal-backdrop" onClick={() => setModalPersonas(null)}>
+      {/* Pop-Up Modal Window for Persona & Debate Transcript Inspection */}
+      {modalData && (
+        <div className="modal-backdrop" onClick={() => setModalData(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Users size={20} color="#38bdf8" />
-                <h3 style={{ margin: 0 }}>Allocated Personas ({modalPersonas.length})</h3>
+                <h3 style={{ margin: 0 }}>Debate Team & Transcript ({modalData.personas.length} Personas)</h3>
               </div>
-              <button className="close-modal-btn" onClick={() => setModalPersonas(null)}>
+              <button className="close-modal-btn" onClick={() => setModalData(null)}>
                 <X size={20} />
               </button>
             </div>
 
             <div className="modal-body">
-              {modalPersonas.map((p, idx) => (
+              <h4 style={{ color: '#38bdf8', marginTop: 0 }}>👥 Allocated Personas</h4>
+              {modalData.personas.map((p, idx) => (
                 <div key={p.id || idx} className="persona-card">
                   <div className="persona-card-header">
                     <span className="persona-badge">Persona {idx + 1}</span>
@@ -199,6 +193,23 @@ export default function App() {
                   </div>
                 </div>
               ))}
+
+              {modalData.transcript && modalData.transcript.length > 0 && (
+                <>
+                  <h4 style={{ color: '#818cf8', marginTop: '1.5rem' }}>💬 Debate Transcript Highlights</h4>
+                  {modalData.transcript.map((t, idx) => (
+                    <div key={idx} className="persona-card" style={{ borderLeft: '4px solid #818cf8' }}>
+                      <div className="persona-card-header">
+                        <MessageCircle size={16} color="#818cf8" />
+                        <span className="persona-name">{t.personaName}</span>
+                      </div>
+                      <div className="persona-detail" style={{ whiteSpace: 'pre-wrap', marginTop: '0.4rem' }}>
+                        {t.output}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </div>

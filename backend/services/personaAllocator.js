@@ -1,6 +1,25 @@
 import { callLLM } from './llmProvider.js';
 
 /**
+ * Checks if a user prompt is casual conversation or simple general chat.
+ */
+function isCasualConversation(prompt) {
+  const clean = prompt.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
+
+  const casualPhrases = [
+    'hi', 'hello', 'hey', 'namaste', 'good morning', 'good evening',
+    'thanks', 'thank you', 'how are you', 'how are you doing', 'how is it going',
+    'who are you', 'what can you do', 'sup', 'yo', 'nice to meet you', 'am fine', 'i am fine', 'im fine'
+  ];
+
+  const isCasualPhrase = casualPhrases.some(phrase => clean.includes(phrase));
+  const technicalKeywords = ['code', 'build', 'project', 'app', 'system', 'tech', 'react', 'api', 'database', 'security', 'story', 'design', 'market'];
+  const hasTechKeywords = technicalKeywords.some(kw => clean.includes(kw));
+
+  return (isCasualPhrase || clean.length <= 15) && !hasTechKeywords;
+}
+
+/**
  * Detects if a prompt is creative or technical to scale temperature accordingly.
  */
 function detectTemperature(prompt) {
@@ -10,26 +29,58 @@ function detectTemperature(prompt) {
 }
 
 /**
- * Step A: Dynamic Persona Allocator Agent
- * Analyzes prompt & session context to return 3-5 specialized personas with easy Indian names.
+ * Pool of diverse, easily pronounceable Indian names.
+ */
+const INDIAN_NAMES_POOL = [
+  'Aarav', 'Ananya', 'Kabir', 'Diya', 'Rohan', 'Priya', 'Aditya', 'Meera',
+  'Vikram', 'Sneha', 'Rahul', 'Tanvi', 'Ishaan', 'Kavya', 'Samar', 'Neha'
+];
+
+function getRandomIndianName(usedNames = []) {
+  const available = INDIAN_NAMES_POOL.filter(n => !usedNames.includes(n));
+  const pool = available.length > 0 ? available : INDIAN_NAMES_POOL;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * Step A: Dynamic Persona Allocator Agent (with Session Persona Lock & Intent Routing)
  */
 export async function allocatePersonas(userPrompt, existingPersonas = [], provider = 'gemini') {
-  const temperature = detectTemperature(userPrompt);
+  // 1. CASUAL CONVERSATION BYPASS: Re-use existing persona if available!
+  if (isCasualConversation(userPrompt)) {
+    if (existingPersonas && existingPersonas.length > 0) {
+      // Re-use the existing persona from the session!
+      return existingPersonas;
+    }
 
-  const existingContext = existingPersonas.length > 0
-    ? `Current Chat Personas: ${JSON.stringify(existingPersonas.map(p => p.name))}\nAnalyze if a NEW specialist persona is needed for this new follow-up prompt. If current personas cover it, return the existing ones.`
-    : `No existing personas. Allocate 3 to 5 specialized expert personas for this new topic.`;
+    const greetingName = getRandomIndianName();
+    return [
+      {
+        id: 'communicator',
+        name: `${greetingName} (Friendly Assistant)`,
+        role: 'Handles casual conversation and general assistance.',
+        mindset: 'Respond simply, warmly, and concisely. Do NOT generate complex technical debate.'
+      }
+    ];
+  }
+
+  // 2. DOMAIN / TECHNICAL QUERY: If existing team fits topic, re-use it. Otherwise allocate/adapt personas.
+  const temperature = detectTemperature(userPrompt);
+  const existingNames = existingPersonas.map(p => p.name);
 
   const systemInstruction = `You are an expert AI Multi-Agent System Coordinator.
-Your task is to analyze the user's prompt and determine specialized expert personas best suited to debate and solve the task.
+Your task is to analyze the user prompt and determine specialized expert personas best suited to solve it.
 
-${existingContext}
+DYNAMIC PERSONA NUMBER SCALING:
+- Moderate complexity ➔ Allocate 3 personas.
+- High complexity / multi-faceted ➔ Allocate 4 or 5 personas.
 
-CRITICAL INSTRUCTIONS FOR PERSONA NAMING & ROLES:
-1. Every persona MUST be given a clear, easily pronounceable Indian human name paired with their expert title for high user engagement (e.g., "Arjun (System Architect)", "Priya (Security Auditor)", "Rohan (Product Lead)", "Ananya (Creative Writer)", "Kabir (UX Specialist)", "Vikram (Code Quality Engineer)").
-2. Choose personas with contrasting perspectives.
-3. Mindset instructions must be generic (e.g., "Critique the previous solution for flaws and suggest new improvements").
-4. Respond ONLY with a valid, clean JSON array of objects. Do NOT include markdown codeblocks (no \`\`\`json).
+RULES:
+1. SESSION PERSISTENCE: If the existing personas (${JSON.stringify(existingNames)}) already cover the topic, RETURN THE SAME PERSONAS without changing their names.
+2. ADAPTATION: Only add a new persona if a completely new domain is introduced. Only remove a persona if the topic simplified.
+3. NAMING: Assign diverse Indian human names paired with titles (e.g. "Kabir (System Architect)", "Ananya (UX Designer)", "Aarav (Security Auditor)").
+4. Mindset instructions must be generic (e.g. "Critique the previous solution for flaws and suggest new improvements").
+5. Respond ONLY with a valid JSON array of objects. No markdown formatting (\`\`\`json).
 
 JSON SCHEMA REQUIREMENT:
 [
@@ -42,7 +93,7 @@ JSON SCHEMA REQUIREMENT:
 ]`;
 
   const rawResponse = await callLLM({
-    prompt: `User Prompt: "${userPrompt}"\n\nDetermine the optimal specialized personas with friendly Indian names to debate this topic.`,
+    prompt: `User Prompt: "${userPrompt}"\nExisting Personas: ${JSON.stringify(existingNames)}\n\nAnalyze topic and allocate 3, 4, or 5 specialized personas with distinct Indian names.`,
     systemInstruction,
     provider,
     temperature
@@ -54,28 +105,34 @@ JSON SCHEMA REQUIREMENT:
       cleanJson = cleanJson.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
     }
     const personas = JSON.parse(cleanJson);
-    if (!Array.isArray(personas) || personas.length < 3) {
+    if (!Array.isArray(personas) || personas.length === 0) {
       throw new Error('Invalid persona array returned from LLM');
     }
     return personas;
   } catch (err) {
     console.warn('Falling back to default Indian personas:', err.message);
-    return existingPersonas.length > 0 ? existingPersonas : [
+    if (existingPersonas.length > 0) return existingPersonas;
+
+    const n1 = getRandomIndianName();
+    const n2 = getRandomIndianName([n1]);
+    const n3 = getRandomIndianName([n1, n2]);
+
+    return [
       {
-        id: 'arjun_tech_lead',
-        name: 'Arjun (Technical Lead)',
+        id: 'tech_lead',
+        name: `${n1} (Technical Lead)`,
         role: 'Focuses on architecture, code quality, and technical scalability.',
         mindset: 'Identify architectural flaws and premature optimizations in previous proposals.'
       },
       {
-        id: 'rohan_junior_dev',
-        name: 'Rohan (Junior Developer)',
+        id: 'junior_dev',
+        name: `${n2} (Junior Developer)`,
         role: 'Focuses on simplicity, readability, and ease of implementation.',
         mindset: 'Point out overly complex solutions and suggest simpler code alternatives.'
       },
       {
-        id: 'priya_security',
-        name: 'Priya (Security Auditor)',
+        id: 'security_auditor',
+        name: `${n3} (Security Auditor)`,
         role: 'Focuses on vulnerability identification, data safety, and edge cases.',
         mindset: 'Critique previous proposals for security holes and privacy flaws.'
       }
