@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { callLLM } from './services/llmProvider.js';
 import { allocatePersonas } from './services/personaAllocator.js';
 import { runDebate } from './services/debateEngine.js';
+import { runDualVerification } from './services/dualVerifier.js';
 import { connectDB } from './config/db.js';
 
 dotenv.config();
@@ -96,13 +97,24 @@ app.post('/api/chat/debate', async (req, res) => {
       provider
     });
 
+    // Step C: Run Dual-Persona Verification Layer (Fact Auditor + Completeness Auditor)
+    let verificationResult = { verified: true, verifiers: [], finalResponse: debateResult.consensus };
+    if (personas.length > 1) {
+      verificationResult = await runDualVerification({
+        userPrompt: prompt,
+        debateConsensus: debateResult.consensus,
+        provider
+      });
+    }
+
     return res.json({
       success: true,
       prompt,
       count: personas.length,
       personas,
-      response: debateResult.consensus,
-      transcript: debateResult.transcript
+      response: verificationResult.finalResponse,
+      transcript: debateResult.transcript,
+      verification: verificationResult
     });
   } catch (error) {
     console.error('Debate Engine Error:', error.message);

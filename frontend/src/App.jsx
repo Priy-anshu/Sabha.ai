@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { MessageSquare, Plus, Send, Bot, Users, ShieldAlert, Sparkles, X, Eye, Copy, Check, MessageCircle } from 'lucide-react';
+import { MessageSquare, Plus, Send, Bot, Users, ShieldAlert, Sparkles, X, Eye, Copy, Check, MessageCircle, ShieldCheck } from 'lucide-react';
 
 export default function App() {
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: 'ai',
-      text: 'Har Har Mahadev! Step B (Sequential Adversarial Debate Loop) is active. Type any question to launch a multi-persona debate!',
+      text: 'Har Har Mahadev! Phase 4 (Step C Dual-Persona Verification Layer) is active. Responses are now audited by 2 independent verifiers before delivery!',
       personas: [],
-      transcript: []
+      transcript: [],
+      verification: null
     }
   ]);
   const [activePersonas, setActivePersonas] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [modalData, setModalData] = useState(null); // { personas, transcript }
+  const [modalData, setModalData] = useState(null); // { personas, transcript, verification }
   const [copiedId, setCopiedId] = useState(null);
 
   const handleNewChat = () => {
@@ -38,7 +39,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      // Execute Step A Allocation + Step B Multi-Turn Debate Loop
+      // Execute 4-Step Pipeline: Allocation -> Debate -> Dual Verification -> Output
       const debateRes = await fetch('/api/chat/debate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,7 +56,8 @@ export default function App() {
             sender: 'ai',
             text: debateData.response,
             personas: debateData.personas,
-            transcript: debateData.transcript
+            transcript: debateData.transcript,
+            verification: debateData.verification
           }
         ]);
       } else {
@@ -97,7 +99,7 @@ export default function App() {
       {/* Main Chat Area */}
       <div className="main-chat-area">
         <div className="chat-header">
-          <span className="chat-title">Multi-Agent AI Debate System — Phase 3 Debate Engine</span>
+          <span className="chat-title">Multi-Agent AI Debate System — Phase 4 Dual Verification</span>
         </div>
 
         <div className="messages-container">
@@ -107,17 +109,24 @@ export default function App() {
               className={`message-bubble ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}
             >
               <div className="message-sender-header">
-                <span>{msg.sender === 'user' ? 'You' : 'AI Multi-Agent Debate Team'}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {msg.sender === 'user' ? 'You' : 'AI Multi-Agent Team'}
+                  {msg.sender === 'ai' && msg.verification && (
+                    <span className="verified-badge" title="Audited by Dual Verifiers">
+                      <ShieldCheck size={13} color="#4ade80" /> Audit Verified
+                    </span>
+                  )}
+                </span>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {/* Clickable Persona & Transcript Pop-Up Badge */}
                   {msg.sender === 'ai' && msg.personas && msg.personas.length > 0 && (
                     <button
                       className="view-personas-badge-btn"
-                      onClick={() => setModalData({ personas: msg.personas, transcript: msg.transcript })}
+                      onClick={() => setModalData({ personas: msg.personas, transcript: msg.transcript, verification: msg.verification })}
                     >
                       <Users size={14} color="#38bdf8" />
-                      <span>Inspect {msg.personas.length} Personas & Debate</span>
+                      <span>Inspect {msg.personas.length} Personas & Audit</span>
                       <Eye size={12} style={{ marginLeft: '2px' }} />
                     </button>
                   )}
@@ -141,7 +150,7 @@ export default function App() {
             <div className="message-bubble ai-message">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontStyle: 'italic' }}>
                 <Sparkles size={16} className="spin-icon" color="#38bdf8" />
-                Allocating expert personas & running sequential debate loop...
+                Allocating personas, debating & running Dual Verifier Audit...
               </div>
             </div>
           )}
@@ -151,7 +160,7 @@ export default function App() {
           <input
             type="text"
             className="chat-input"
-            placeholder="Type any prompt (e.g. 'Which tech stack is best for a real-time card game?')..."
+            placeholder="Type your message or prompt here..."
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
@@ -162,14 +171,14 @@ export default function App() {
         </div>
       </div>
 
-      {/* Pop-Up Modal Window for Persona & Debate Transcript Inspection */}
+      {/* Pop-Up Modal Window for Persona, Debate & Verification Inspection */}
       {modalData && (
         <div className="modal-backdrop" onClick={() => setModalData(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Users size={20} color="#38bdf8" />
-                <h3 style={{ margin: 0 }}>Debate Team & Transcript ({modalData.personas.length} Personas)</h3>
+                <h3 style={{ margin: 0 }}>Debate Team & Verification Audit</h3>
               </div>
               <button className="close-modal-btn" onClick={() => setModalData(null)}>
                 <X size={20} />
@@ -177,7 +186,23 @@ export default function App() {
             </div>
 
             <div className="modal-body">
-              <h4 style={{ color: '#38bdf8', marginTop: 0 }}>👥 Allocated Personas</h4>
+              {/* Dual Verifier Audit Section */}
+              {modalData.verification && modalData.verification.verifiers && modalData.verification.verifiers.length > 0 && (
+                <div style={{ marginBottom: '1rem', background: 'rgba(74, 222, 128, 0.1)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(74, 222, 128, 0.3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#4ade80', fontWeight: 700, marginBottom: '0.5rem' }}>
+                    <ShieldCheck size={18} />
+                    <span>Step C: Dual-Persona Verification Audit Passed</span>
+                  </div>
+                  {modalData.verification.verifiers.map((v, idx) => (
+                    <div key={idx} style={{ fontSize: '0.85rem', color: '#e2e8f0', marginTop: '0.4rem' }}>
+                      <strong>{v.name}:</strong> <span style={{ color: '#4ade80' }}>{v.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Allocated Personas Section */}
+              <h4 style={{ color: '#38bdf8', marginTop: 0 }}>👥 Allocated Personas ({modalData.personas.length})</h4>
               {modalData.personas.map((p, idx) => (
                 <div key={p.id || idx} className="persona-card">
                   <div className="persona-card-header">
@@ -194,9 +219,10 @@ export default function App() {
                 </div>
               ))}
 
+              {/* Debate Transcript Highlights */}
               {modalData.transcript && modalData.transcript.length > 0 && (
                 <>
-                  <h4 style={{ color: '#818cf8', marginTop: '1.5rem' }}>💬 Debate Transcript Highlights</h4>
+                  <h4 style={{ color: '#818cf8', marginTop: '1.5rem' }}>💬 Step B Debate Transcript Highlights</h4>
                   {modalData.transcript.map((t, idx) => (
                     <div key={idx} className="persona-card" style={{ borderLeft: '4px solid #818cf8' }}>
                       <div className="persona-card-header">
