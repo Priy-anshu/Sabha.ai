@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { Paperclip, Send, FileText, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function ChatInput({
   input,
@@ -7,9 +8,19 @@ export default function ChatInput({
   attachedFile,
   setAttachedFile,
   loading,
-  onSend
+  onSend,
+  onOpenAuthModal
 }) {
+  const { user } = useAuth();
   const fileInputRef = useRef(null);
+
+  const handlePaperclipClick = () => {
+    if (!user) {
+      onOpenAuthModal();
+      return;
+    }
+    fileInputRef.current?.click();
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -44,8 +55,8 @@ export default function ChatInput({
 
         <button
           className="attach-btn"
-          onClick={() => fileInputRef.current?.click()}
-          title="Attach PDF or document to Sabha.ai"
+          onClick={handlePaperclipClick}
+          title={user ? "Attach PDF or document to Sabha.ai" : "Sign In to attach documents"}
           style={{ background: 'transparent', border: 'none', color: attachedFile ? '#38bdf8' : '#94a3b8', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center' }}
         >
           <Paperclip size={20} />

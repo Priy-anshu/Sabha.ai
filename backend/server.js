@@ -10,6 +10,7 @@ import { extractTextFromFile, chunkText, retrieveRelevantContext } from './servi
 import { connectDB } from './config/db.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import { protect } from './middleware/authMiddleware.js';
 import { ChatDocs } from './models/ChatDocs.js';
 
 dotenv.config();
@@ -50,13 +51,22 @@ app.post('/api/chat/allocate-personas', async (req, res) => {
   }
 });
 
-// POST /api/chat/debate - Full Pipeline with ChatDocs RAG Memory
-app.post('/api/chat/debate', upload.single('file'), async (req, res) => {
+// POST /api/chat/debate - Full Pipeline with Auth Protection for File Attachments
+app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) => {
   try {
     const prompt = req.body.prompt;
     const provider = req.body.provider || 'gemini';
     const existingPersonas = req.body.existingPersonas ? JSON.parse(req.body.existingPersonas) : [];
     const sessionId = req.body.sessionId || 'sess_default';
+    const isGuestUser = !req.user || req.user.userId === 'guest_user_101';
+
+    // ENFORCE AUTH FOR FILE ATTACHMENTS: Guests can only send text prompts
+    if (req.file && isGuestUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Document upload requires a signed-in account. Please Sign In or Register to upload files.'
+      });
+    }
 
     if (!prompt && !req.file) {
       return res.status(400).json({ success: false, error: 'Prompt or document file is required' });
@@ -65,10 +75,10 @@ app.post('/api/chat/debate', upload.single('file'), async (req, res) => {
     let documentContext = '';
     let attachedFileName = '';
 
-    // Step RAG 1: If a new file is uploaded, extract text & save into ChatDocs model!
-    if (req.file) {
+    // Step RAG 1: If user is logged in & attached a file
+    if (req.file && !isGuestUser) {
       attachedFileName = req.file.originalname;
-      console.log(`📄 Processing attached file: ${attachedFileName}`);
+      console.log(`📄 Processing attached file for user ${req.user.email}: ${attachedFileName}`);
       const rawText = await extractTextFromFile(req.file);
       const chunks = chunkText(rawText);
 
@@ -84,8 +94,8 @@ app.post('/api/chat/debate', upload.single('file'), async (req, res) => {
       });
 
       documentContext = retrieveRelevantContext(chunks, prompt || 'Summary', rawText);
-    } else if (sessionId) {
-      // Step RAG 2: If no new file attached, check ChatDocs for existing session document memory!
+    } else if (sessionId && !isGuestUser) {
+      // Step RAG 2: Check ChatDocs memory for logged-in user
       const existingDocs = await ChatDocs.find({ sessionId }).sort({ uploadedAt: -1 });
       if (existingDocs && existingDocs.length > 0) {
         const latestDoc = existingDocs[0];

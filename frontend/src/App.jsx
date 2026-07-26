@@ -170,6 +170,7 @@ export default function App() {
           setAttachedFile={setAttachedFile}
           loading={loading}
           onSend={handleSend}
+          onOpenAuthModal={() => setShowAuthModal(true)}
         />
       </div>
 
