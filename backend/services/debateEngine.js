@@ -18,7 +18,7 @@ export async function runDebate({ userPrompt, personas, provider = 'gemini', doc
     const singlePersona = personas[0];
     const systemPrompt = `You are ${singlePersona.name}, acting in the role of ${singlePersona.role}.
 Mindset: ${singlePersona.mindset}.
-Use any attached document context if provided to answer the user warmly and accurately.`;
+Use any attached document context if provided to answer the user warmly and accurately. Use markdown bullet points (- ) for sub-items.`;
 
     const singleResponse = await callLLM({
       prompt: contextAugmentedPrompt,
@@ -40,7 +40,7 @@ Use any attached document context if provided to answer the user warmly and accu
   const persona1 = personas[0];
   const p1Instruction = `You are ${persona1.name} (${persona1.role}).
 Mindset: ${persona1.mindset}.
-Analyze the user request and the attached document context (if provided) and propose your initial technical/analytical solution.`;
+Analyze the user request and the attached document context (if provided) and propose your initial technical/analytical solution. Use markdown hyphens (- ) for sub-item bullet lists under subheadings.`;
 
   currentProposal = await callLLM({
     prompt: contextAugmentedPrompt,
@@ -60,7 +60,7 @@ Analyze the user request and the attached document context (if provided) and pro
     const p = personas[i];
     const critiqueInstruction = `You are ${p.name} (${p.role}).
 Mindset: ${p.mindset}.
-Review the user query, attached document context, and previous solution. Critique the previous solution for flaws, security issues, performance bottlenecks, or unhandled edge cases. Present your refined version.`;
+Review the user query, attached document context, and previous solution. Critique the previous solution for flaws, security issues, performance bottlenecks, or unhandled edge cases. Present your refined version using markdown hyphens (- ) for bullet lists.`;
 
     const nextOutput = await callLLM({
       prompt: `${contextAugmentedPrompt}\n\nPrevious Solution by ${personas[i - 1].name}:\n${currentProposal}\n\nProvide your critique and refined proposal:`,
@@ -79,7 +79,18 @@ Review the user query, attached document context, and previous solution. Critiqu
 
   // Step 4: Final Master Synthesizer Agent
   const synthesizerInstruction = `You are the Lead Synthesis Master Agent.
-Synthesize all persona proposals, critiques, and attached document context into a unified, flawless, well-structured final answer. Do NOT mention verifier names in the output.`;
+Synthesize all persona proposals, critiques, and attached document context into a unified, flawless, well-structured final answer.
+
+STRICT MARKDOWN BULLET FORMATTING RULES:
+1. Every sub-item, test case, sub-heading point, or key principle MUST start with a markdown hyphen and space ("- ").
+   Example:
+   ### How to Test It:
+   - **The Test of Adversity:** Does their character hold up when things fall apart...
+   - **The Principle of Anonymity:** Would they still strive for virtue...
+   - **The Legacy of Contribution:** Do they elevate human dignity...
+
+2. NEVER output key-value items as un-bulleted plain lines under subheadings. Every sub-item MUST start with "- ".
+3. Do NOT mention verifier names in the final output.`;
 
   const finalConsensus = await callLLM({
     prompt: `${contextAugmentedPrompt}\n\nDebate Transcript:\n${transcript.map(t => `${t.personaName}: ${t.output}`).join('\n\n')}\n\nSynthesize the final answer:`,

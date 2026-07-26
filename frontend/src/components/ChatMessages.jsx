@@ -1,15 +1,63 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Users, Eye, Check, Copy, Sparkles, MessageSquare, ShieldAlert, Cpu, FileText, Zap } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Bot, ShieldCheck, Users, Eye, Check, Copy, Sparkles, ShieldAlert, Cpu, FileText, Zap, ChevronDown, ChevronUp } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../context/AuthContext.jsx';
 
+// Component for rendering user prompt text with Copy button & "Show More / Show Less" after 3 lines
+function ExpandableUserText({ text, msgId, onCopy, isCopied }) {
+  const [expanded, setExpanded] = useState(false);
+  const safeText = typeof text === 'string' ? text : String(text || '');
+  const isLongText = safeText.length > 180 || safeText.split('\n').length > 3;
+
+  const truncatedText = isLongText ? safeText.slice(0, 180) + '...' : safeText;
+
+  return (
+    <div className="user-message-body" style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+        <div className="message-content" style={{ flex: 1 }}>
+          <span>{expanded || !isLongText ? safeText : truncatedText}</span>
+          {isLongText && (
+            <button
+              className="expand-text-btn"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? (
+                <>
+                  <span>Show Less</span> <ChevronUp size={13} />
+                </>
+              ) : (
+                <>
+                  <span>Show More</span> <ChevronDown size={13} />
+                </>
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* User Prompt Copy Button */}
+        <button
+          className="copy-btn user-copy-btn"
+          onClick={() => onCopy(msgId, safeText)}
+          title="Copy prompt"
+          style={{ opacity: 0.8, color: 'rgba(255, 255, 255, 0.85)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px' }}
+        >
+          {isCopied ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatMessages({
-  messages,
+  messages = [],
   loading,
   onInspectModal,
   onSelectSuggestion
 }) {
   const { user } = useAuth();
   const [copiedId, setCopiedId] = useState(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef(null);
 
   const handleCopy = (id, text) => {
     navigator.clipboard.writeText(text);
@@ -17,8 +65,16 @@ export default function ChatMessages({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Filter out default welcome system message if user has started talking
-  const displayMessages = messages.filter(m => m.id !== 1 || messages.length === 1);
+  // Scroll detection to temporarily show scrollbar and hide it when scrolling stops
+  const handleScroll = () => {
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 1000);
+  };
 
   const suggestions = [
     {
@@ -43,8 +99,8 @@ export default function ChatMessages({
     }
   ];
 
-  // ChatGPT Landing View (When starting a New Chat)
-  if (messages.length <= 1) {
+  // ChatGPT Landing View: Only when messages list is completely empty AND not loading
+  if (messages.length === 0 && !loading) {
     return (
       <div className="hero-landing-container">
         <div className="hero-greeting">
@@ -76,58 +132,80 @@ export default function ChatMessages({
     );
   }
 
-  // Active Message Feed View
+  // Active Message Feed View with Rightmost Auto-Hiding Scrollbar
   return (
-    <div className="messages-container">
-      {displayMessages.map(msg => (
-        <div
-          key={msg.id}
-          className={`message-bubble ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}
-        >
-          <div className="message-sender-header">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {msg.sender === 'user' ? (user ? user.name : 'You') : null}
-              {msg.sender === 'ai' && msg.verification && (
-                <span className="verified-badge" title="Audited by Dual Verifiers">
-                  <ShieldCheck size={13} color="#4ade80" /> Audit Verified
+    <div
+      className={`messages-feed-wrapper ${isScrolling ? 'scrolling-active' : ''}`}
+      onScroll={handleScroll}
+    >
+      <div className="messages-container">
+        {messages.map(msg => (
+          <div
+            key={msg.id}
+            className={`message-bubble ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}
+          >
+            {msg.sender === 'ai' && (
+              <div className="message-sender-header">
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Bot size={18} color="#38bdf8" />
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Sabha<span style={{ color: '#818cf8' }}>.ai</span></span>
                 </span>
-              )}
-            </span>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {msg.sender === 'ai' && msg.personas && msg.personas.length > 0 && (
-                <button
-                  className="view-personas-badge-btn"
-                  onClick={() => onInspectModal({ personas: msg.personas, transcript: msg.transcript, verification: msg.verification })}
-                >
-                  <Users size={14} color="#38bdf8" />
-                  <span>Inspect {msg.personas.length} Personas & Audit</span>
-                  <Eye size={12} style={{ marginLeft: '2px' }} />
-                </button>
-              )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {msg.personas && msg.personas.length > 0 && (
+                    <button
+                      className="view-personas-badge-btn"
+                      onClick={() => onInspectModal({ personas: msg.personas, transcript: msg.transcript, verification: msg.verification })}
+                    >
+                      <Users size={14} color="#38bdf8" />
+                      <span>Inspect {msg.personas.length} Personas & Audit</span>
+                      <Eye size={12} style={{ marginLeft: '2px' }} />
+                    </button>
+                  )}
 
-              <button
-                className="copy-btn"
-                onClick={() => handleCopy(msg.id, msg.text)}
-                title="Copy to clipboard"
-              >
-                {copiedId === msg.id ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
-              </button>
+                  <button
+                    className="copy-btn"
+                    onClick={() => handleCopy(msg.id, msg.text)}
+                    title="Copy to clipboard"
+                  >
+                    {copiedId === msg.id ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Render User Prompts vs AI Rich Markdown Responses */}
+            {msg.sender === 'user' ? (
+              <ExpandableUserText
+                text={msg.text}
+                msgId={msg.id}
+                onCopy={handleCopy}
+                isCopied={copiedId === msg.id}
+              />
+            ) : (
+              <div className="message-content markdown-body">
+                <ReactMarkdown>{msg.text}</ReactMarkdown>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Immediate Pulsing Loading Indicator Bubble */}
+        {loading && (
+          <div className="message-bubble ai-message">
+            <div className="message-sender-header" style={{ marginBottom: '0.25rem' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Bot size={18} color="#38bdf8" />
+                <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Sabha<span style={{ color: '#818cf8' }}>.ai</span></span>
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontStyle: 'italic', color: 'var(--text-muted)' }}>
+              <Sparkles size={16} className="spin-icon" color="#38bdf8" />
+              Debating & auditing consensus...
             </div>
           </div>
-
-          <div className="message-content">{msg.text}</div>
-        </div>
-      ))}
-
-      {loading && (
-        <div className="message-bubble ai-message">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontStyle: 'italic' }}>
-            <Sparkles size={16} className="spin-icon" color="#38bdf8" />
-            Debating & auditing consensus...
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

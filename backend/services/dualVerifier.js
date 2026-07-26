@@ -58,7 +58,8 @@ Your job is to take an initial proposed answer and refine it using feedback from
 1. Fact Auditor Feedback: ${factAuditResult}
 2. Completeness Auditor Feedback: ${completenessAuditResult}
 
-Produce the final, flawless, polished response for the user. Do NOT mention verifier names in your output.`;
+FORMATTING RULE: Preserve markdown bullet points (- ) for all sub-items under headings.
+Produce a final, polished, error-free answer addressing all feedback. Do NOT include verifier names or meta commentary in your response.`;
 
     finalVerifiedOutput = await callLLM({
       prompt: `User Prompt: "${userPrompt}"\nInitial Answer: ${debateConsensus}\n\nProduce the final audited & polished response:`,
