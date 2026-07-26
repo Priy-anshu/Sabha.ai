@@ -1,7 +1,7 @@
 {
-  "name": "multi-agent-debate-backend",
+  "name": "sabha-ai-backend",
   "version": "1.0.0",
-  "description": "Node.js Express backend for Multi-Agent Dynamic Debate & Verification System",
+  "description": "Node.js Express backend for Sabha.ai Multi-Agent Consensus & Verification System",
   "main": "server.js",
   "type": "module",
   "scripts": {
