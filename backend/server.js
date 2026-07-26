@@ -30,7 +30,7 @@ connectDB();
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Multi-Agent Debate Backend with RAG is running' });
+  res.json({ status: 'ok', message: 'Sabha.ai Backend with RAG is running' });
 });
 
 // POST /api/chat/allocate-personas - Step A: Persona Allocator
@@ -113,7 +113,7 @@ app.post('/api/chat/debate', upload.single('file'), async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`==================================================`);
-  console.log(`🚀 Multi-Agent Debate Backend with RAG running on port ${PORT}`);
+  console.log(`🚀 Sabha.ai Backend with RAG running on port ${PORT}`);
   console.log(`📡 Health Check: http://localhost:${PORT}/api/health`);
   console.log(`==================================================`);
 });

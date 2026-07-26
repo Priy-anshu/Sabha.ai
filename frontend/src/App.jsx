@@ -10,7 +10,7 @@ export default function App() {
     {
       id: 1,
       sender: 'ai',
-      text: 'Har Har Mahadev! Phase 6 Multimodal RAG Document Q&A is active. Click the Paperclip icon to attach PDFs or text documents!',
+      text: 'Har Har Mahadev! Welcome to Sabha.ai — your Multi-Agent Consensus & Verification Platform. Ask any complex question or attach documents to launch an AI debate!',
       personas: [],
       transcript: [],
       verification: null
@@ -302,11 +302,11 @@ export default function App() {
       {/* Sidebar */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <Bot size={24} />
-          <span>Multi-Agent Platform</span>
+          <Bot size={26} color="#38bdf8" />
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Sabha<span style={{ color: '#818cf8' }}>.ai</span></span>
         </div>
         <button className="new-chat-btn" onClick={handleNewChat}>
-          <Plus size={18} /> New Chat
+          <Plus size={18} /> New Session
         </button>
 
         <div className="chat-history">
@@ -358,7 +358,10 @@ export default function App() {
       {/* Main Chat Area */}
       <div className="main-chat-area">
         <div className="chat-header">
-          <span className="chat-title">Multi-Agent AI Debate System — Phase 6 Multimodal RAG</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="chat-title" style={{ fontSize: '1.1rem', fontWeight: 700 }}>Sabha<span style={{ color: '#38bdf8' }}>.ai</span></span>
+            <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>| Multi-Agent Consensus Platform</span>
+          </div>
           {user && <span style={{ fontSize: '0.85rem', color: '#38bdf8' }}>Logged in as {user.name}</span>}
         </div>
 
@@ -370,7 +373,7 @@ export default function App() {
             >
               <div className="message-sender-header">
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {msg.sender === 'user' ? (user ? user.name : 'You') : 'AI Multi-Agent Team'}
+                  {msg.sender === 'user' ? (user ? user.name : 'You') : 'Sabha.ai Council'}
                   {msg.sender === 'ai' && msg.verification && (
                     <span className="verified-badge" title="Audited by Dual Verifiers">
                       <ShieldCheck size={13} color="#4ade80" /> Audit Verified
@@ -408,7 +411,7 @@ export default function App() {
             <div className="message-bubble ai-message">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontStyle: 'italic' }}>
                 <Sparkles size={16} className="spin-icon" color="#38bdf8" />
-                Processing RAG context, debating & running Dual Verifier Audit...
+                Sabha.ai Council is debating, auditing & synthesizing consensus...
               </div>
             </div>
           )}
@@ -439,7 +442,7 @@ export default function App() {
           <button
             className="attach-btn"
             onClick={() => fileInputRef.current?.click()}
-            title="Attach PDF or document"
+            title="Attach PDF or document to Sabha.ai"
             style={{ background: 'transparent', border: 'none', color: attachedFile ? '#38bdf8' : '#94a3b8', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center' }}
           >
             <Paperclip size={20} />
@@ -448,7 +451,7 @@ export default function App() {
           <input
             type="text"
             className="chat-input"
-            placeholder={attachedFile ? "Ask a question about this document..." : "Type your message or prompt here..."}
+            placeholder={attachedFile ? "Ask Sabha.ai Council about this document..." : "Ask Sabha.ai Council anything..."}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
@@ -465,7 +468,7 @@ export default function App() {
           <div className="modal-content auth-modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ margin: 0 }}>
-                {authMode === 'otp' ? 'Email Verification' : (authMode === 'login' ? 'Sign In' : 'Create Account')}
+                {authMode === 'otp' ? 'Email Verification' : (authMode === 'login' ? 'Sign In to Sabha.ai' : 'Create Sabha.ai Account')}
               </h3>
               <button className="close-modal-btn" onClick={() => setShowAuthModal(false)}>
                 <X size={20} />
@@ -593,7 +596,7 @@ export default function App() {
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Users size={20} color="#38bdf8" />
-                <h3 style={{ margin: 0 }}>Debate Team & Verification Audit</h3>
+                <h3 style={{ margin: 0 }}>Sabha.ai Council & Verification Audit</h3>
               </div>
               <button className="close-modal-btn" onClick={() => setModalData(null)}>
                 <X size={20} />
