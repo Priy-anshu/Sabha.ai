@@ -101,7 +101,8 @@ export default function App() {
       const debateData = await sendDebatePrompt({
         prompt: currentInput,
         file: currentFile,
-        existingPersonas: activePersonas
+        existingPersonas: activePersonas,
+        sessionId
       });
 
       if (debateData.success) {

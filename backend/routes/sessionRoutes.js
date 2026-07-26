@@ -1,12 +1,16 @@
 import express from 'express';
 import { ChatSession } from '../models/ChatSession.js';
+import { ChatDetails } from '../models/ChatDetails.js';
+import { ChatDocs } from '../models/ChatDocs.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// GET /api/sessions - List all chat sessions for sidebar
-router.get('/', async (req, res) => {
+// GET /api/sessions - Fast metadata list for sidebar
+router.get('/', protect, async (req, res) => {
   try {
-    const sessions = await ChatSession.find({}, 'sessionId title activePersonas updatedAt')
+    const userId = req.user?.userId || 'guest_user_101';
+    const sessions = await ChatSession.find({ userId }, 'sessionId title activePersonas updatedAt')
       .sort({ updatedAt: -1 });
     return res.json({ success: true, sessions });
   } catch (err) {
@@ -14,52 +18,105 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/sessions/:sessionId - Get specific session history
-router.get('/:sessionId', async (req, res) => {
+// GET /api/sessions/:sessionId - Get specific session metadata + detailed messages
+router.get('/:sessionId', protect, async (req, res) => {
   try {
-    const session = await ChatSession.findOne({ sessionId: req.params.sessionId });
+    const { sessionId } = req.params;
+    const session = await ChatSession.findOne({ sessionId });
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
-    return res.json({ success: true, session });
+
+    // Fetch turn-by-turn message history from ChatDetails
+    const details = await ChatDetails.find({ sessionId }).sort({ timestamp: 1 });
+
+    const formattedMessages = details.map(d => ({
+      id: d.messageId,
+      sender: d.sender,
+      text: d.text,
+      personas: d.personas || [],
+      transcript: d.transcript || [],
+      verification: d.verification || null,
+      attachmentName: d.attachmentName || ''
+    }));
+
+    return res.json({
+      success: true,
+      session: {
+        sessionId: session.sessionId,
+        title: session.title,
+        activePersonas: session.activePersonas,
+        messages: formattedMessages
+      }
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST /api/sessions/save - Save or update session history
-router.post('/save', async (req, res) => {
+// POST /api/sessions/save - Save session metadata & message details
+router.post('/save', protect, async (req, res) => {
   try {
-    const { sessionId, title, activePersonas, messages } = req.body;
+    const { sessionId, activePersonas, messages } = req.body;
+    const userId = req.user?.userId || 'guest_user_101';
+
     if (!sessionId) {
       return res.status(400).json({ success: false, error: 'sessionId is required' });
     }
 
-    const sessionTitle = title || (messages && messages.find(m => m.sender === 'user')?.text?.slice(0, 30)) || 'New Chat';
+    const title = (messages && messages.find(m => m.sender === 'user')?.text?.slice(0, 30)) || 'New Chat';
 
+    // 1. Update ChatSession metadata
     const session = await ChatSession.findOneAndUpdate(
       { sessionId },
       {
         sessionId,
-        title: sessionTitle,
+        userId,
+        title,
         activePersonas: activePersonas || [],
-        messages: messages || [],
         updatedAt: new Date()
       },
       { upsert: true, new: true }
     );
 
+    // 2. Save/upsert latest message turns into ChatDetails
+    if (messages && messages.length > 0) {
+      for (const msg of messages) {
+        await ChatDetails.findOneAndUpdate(
+          { sessionId, messageId: String(msg.id) },
+          {
+            sessionId,
+            messageId: String(msg.id),
+            sender: msg.sender,
+            text: msg.text,
+            personas: msg.personas || [],
+            transcript: msg.transcript || [],
+            verification: msg.verification || null,
+            timestamp: msg.timestamp || new Date()
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+
     return res.json({ success: true, session });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// DELETE /api/sessions/:sessionId - Delete session
-router.delete('/:sessionId', async (req, res) => {
+// DELETE /api/sessions/:sessionId - Cascade delete session metadata, messages & docs
+router.delete('/:sessionId', protect, async (req, res) => {
   try {
-    await ChatSession.deleteOne({ sessionId: req.params.sessionId });
-    return res.json({ success: true, message: 'Session deleted' });
+    const { sessionId } = req.params;
+
+    await Promise.all([
+      ChatSession.deleteOne({ sessionId }),
+      ChatDetails.deleteMany({ sessionId }),
+      ChatDocs.deleteMany({ sessionId })
+    ]);
+
+    return res.json({ success: true, message: 'Session deleted cleanly across all models' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
