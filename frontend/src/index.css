@@ -510,7 +510,7 @@ body {
   font-size: 0.95rem;
   outline: none;
   resize: none;
-  max-height: 180px;
+  max-height: 100px;
   min-height: 24px;
   overflow-y: auto;
   line-height: 1.45;

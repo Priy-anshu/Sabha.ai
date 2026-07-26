@@ -16,11 +16,11 @@ export default function ChatInput({
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // Auto-expand textarea height up to 180px
+  // Auto-expand textarea height up to 4 lines (~100px)
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 100)}px`;
     }
   }, [input]);
 
@@ -82,7 +82,7 @@ export default function ChatInput({
           <Paperclip size={20} />
         </button>
 
-        {/* Multiline Textarea for prompt input */}
+        {/* Multiline Textarea capped at 4 lines */}
         <textarea
           ref={textareaRef}
           className="chat-input"
