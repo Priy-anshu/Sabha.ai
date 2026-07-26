@@ -17,7 +17,7 @@ export default function App() {
     {
       id: 1,
       sender: 'ai',
-      text: 'Har Har Mahadev! Welcome to Sabha.ai — your Multi-Agent Consensus & Verification Platform. Ask any complex question or attach documents to launch an AI debate!',
+      text: 'Har Har Mahadev! Welcome to Sabha.ai — your Multi-Agent Consensus & Verification Platform. Ask any question to launch an AI debate!',
       personas: [],
       transcript: [],
       verification: null
@@ -30,8 +30,9 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
 
-  // Fetch sidebar sessions list
+  // Fetch sidebar sessions list (only for authenticated users)
   const fetchSessionsList = async () => {
+    if (!user) return;
     try {
       const data = await getSessions();
       if (data.success) {
@@ -118,13 +119,15 @@ export default function App() {
         const finalMessages = [...updatedMessages, aiMsg];
         setMessages(finalMessages);
 
-        // Save session history to MongoDB Atlas
-        await saveSession({
-          sessionId,
-          activePersonas: debateData.personas,
-          messages: finalMessages
-        });
-        fetchSessionsList();
+        // Save session history to MongoDB Atlas if user is authenticated
+        if (user) {
+          await saveSession({
+            sessionId,
+            activePersonas: debateData.personas,
+            messages: finalMessages
+          });
+          fetchSessionsList();
+        }
       } else {
         setMessages(prev => [
           ...prev,
@@ -143,19 +146,21 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar Component */}
-      <Sidebar
-        sessions={sessions}
-        sessionId={sessionId}
-        onNewChat={handleNewChat}
-        onSelectSession={handleSelectSession}
-        onDeleteSession={handleDeleteSession}
-        onOpenAuthModal={() => setShowAuthModal(true)}
-      />
+      {/* Sidebar Component (Only rendered for logged-in users) */}
+      {user && (
+        <Sidebar
+          sessions={sessions}
+          sessionId={sessionId}
+          onNewChat={handleNewChat}
+          onSelectSession={handleSelectSession}
+          onDeleteSession={handleDeleteSession}
+          onOpenAuthModal={() => setShowAuthModal(true)}
+        />
+      )}
 
       {/* Main Chat Content Area */}
       <div className="main-chat-area">
-        <ChatHeader />
+        <ChatHeader onOpenAuthModal={() => setShowAuthModal(true)} />
 
         <ChatMessages
           messages={messages}
