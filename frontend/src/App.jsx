@@ -13,16 +13,7 @@ export default function App() {
   const { user, token } = useAuth();
   const [sessionId, setSessionId] = useState(() => 'sess_' + Date.now());
   const [sessions, setSessions] = useState([]);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: 'ai',
-      text: 'Har Har Mahadev! Welcome to Sabha.ai — your Multi-Agent Consensus & Verification Platform. Ask any question to launch an AI debate!',
-      personas: [],
-      transcript: [],
-      verification: null
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [activePersonas, setActivePersonas] = useState([]);
   const [input, setInput] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
@@ -30,7 +21,6 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
 
-  // Ref for AbortController to support Stop Generating
   const abortControllerRef = useRef(null);
 
   const fetchSessionsList = async () => {
@@ -87,7 +77,6 @@ export default function App() {
     }
   };
 
-  // Stop Generation Handler
   const handleStop = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -100,24 +89,24 @@ export default function App() {
     ]);
   };
 
-  const handleSend = async () => {
-    if ((!input.trim() && !attachedFile) || loading) return;
+  const handleSend = async (customPrompt) => {
+    const promptToSend = customPrompt || input;
+    if ((!promptToSend.trim() && !attachedFile) || loading) return;
 
     const userText = attachedFile
-      ? `📎 [Attached: ${attachedFile.name}] ${input}`
-      : input;
+      ? `📎 [Attached: ${attachedFile.name}] ${promptToSend}`
+      : promptToSend;
 
     const userMsg = { id: String(Date.now()), sender: 'user', text: userText };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
 
-    const currentInput = input;
+    const currentInput = promptToSend;
     const currentFile = attachedFile;
     setInput('');
     setAttachedFile(null);
     setLoading(true);
 
-    // Create new AbortController instance
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -172,6 +161,8 @@ export default function App() {
     }
   };
 
+  const isNewChat = messages.length === 0;
+
   return (
     <div className="app-container">
       {/* Sidebar Component */}
@@ -187,25 +178,30 @@ export default function App() {
       )}
 
       {/* Main Chat Content Area */}
-      <div className="main-chat-area">
+      <div className={`main-chat-area ${isNewChat ? 'new-chat-mode' : ''}`}>
         <ChatHeader onOpenAuthModal={() => setShowAuthModal(true)} />
 
         <ChatMessages
           messages={messages}
           loading={loading}
           onInspectModal={setModalData}
+          onSelectSuggestion={(suggestionText) => {
+            setInput(suggestionText);
+          }}
         />
 
-        <ChatInput
-          input={input}
-          setInput={setInput}
-          attachedFile={attachedFile}
-          setAttachedFile={setAttachedFile}
-          loading={loading}
-          onSend={handleSend}
-          onStop={handleStop}
-          onOpenAuthModal={() => setShowAuthModal(true)}
-        />
+        <div className={`input-wrapper-container ${isNewChat ? 'centered-input-wrapper' : ''}`}>
+          <ChatInput
+            input={input}
+            setInput={setInput}
+            attachedFile={attachedFile}
+            setAttachedFile={setAttachedFile}
+            loading={loading}
+            onSend={() => handleSend()}
+            onStop={handleStop}
+            onOpenAuthModal={() => setShowAuthModal(true)}
+          />
+        </div>
       </div>
 
       {/* Auth Pop-Up Modal */}
