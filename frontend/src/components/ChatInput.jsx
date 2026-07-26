@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Paperclip, Send, Square, FileText, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -14,6 +14,15 @@ export default function ChatInput({
 }) {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  // Auto-expand textarea height up to 180px
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+    }
+  }, [input]);
 
   const handlePaperclipClick = () => {
     if (!user) {
@@ -27,6 +36,15 @@ export default function ChatInput({
     const file = e.target.files[0];
     if (file) {
       setAttachedFile(file);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!loading && (input.trim() || attachedFile)) {
+        onSend();
+      }
     }
   };
 
@@ -59,18 +77,20 @@ export default function ChatInput({
           onClick={handlePaperclipClick}
           disabled={loading}
           title={user ? "Attach PDF or document to Sabha.ai" : "Sign In to attach documents"}
-          style={{ background: 'transparent', border: 'none', color: attachedFile ? '#38bdf8' : '#94a3b8', cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center' }}
+          style={{ background: 'transparent', border: 'none', color: attachedFile ? '#38bdf8' : '#94a3b8', cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', alignSelf: 'flex-end', marginBottom: '4px' }}
         >
           <Paperclip size={20} />
         </button>
 
-        <input
-          type="text"
+        {/* Multiline Textarea for prompt input */}
+        <textarea
+          ref={textareaRef}
           className="chat-input"
+          rows={1}
           placeholder={attachedFile ? "Ask Sabha.ai Council about this document..." : "Ask Sabha.ai Council anything..."}
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !loading && onSend()}
+          onKeyDown={handleKeyDown}
           disabled={loading}
         />
 
@@ -80,12 +100,17 @@ export default function ChatInput({
             className="send-btn stop-btn"
             onClick={onStop}
             title="Stop generating"
-            style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+            style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)', alignSelf: 'flex-end', marginBottom: '4px' }}
           >
             <Square size={16} fill="white" />
           </button>
         ) : (
-          <button className="send-btn" onClick={onSend} disabled={!input.trim() && !attachedFile}>
+          <button
+            className="send-btn"
+            onClick={onSend}
+            disabled={!input.trim() && !attachedFile}
+            style={{ alignSelf: 'flex-end', marginBottom: '4px' }}
+          >
             <Send size={18} />
           </button>
         )}

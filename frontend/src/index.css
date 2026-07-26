@@ -506,9 +506,16 @@ body {
   background: transparent;
   border: none;
   color: var(--text-main);
-  padding: 0.75rem 0.5rem;
+  padding: 0.6rem 0.5rem;
   font-size: 0.95rem;
   outline: none;
+  resize: none;
+  max-height: 180px;
+  min-height: 24px;
+  overflow-y: auto;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .send-btn {
