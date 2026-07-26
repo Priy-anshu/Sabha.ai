@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { callLLM } from './services/llmProvider.js';
+import { allocatePersonas } from './services/personaAllocator.js';
 import { connectDB } from './config/db.js';
 
 dotenv.config();
@@ -48,6 +49,30 @@ app.post('/api/chat/test', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || 'An error occurred while communicating with the AI service'
+    });
+  }
+});
+
+// Phase 2 Route: Step A - Allocate Personas
+app.post('/api/chat/allocate-personas', async (req, res) => {
+  try {
+    const { prompt, provider } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    const personas = await allocatePersonas(prompt, provider);
+    return res.json({
+      success: true,
+      prompt,
+      count: personas.length,
+      personas
+    });
+  } catch (error) {
+    console.error('Persona Allocator Error:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });

@@ -5,6 +5,33 @@ import OpenAI from 'openai';
 dotenv.config();
 
 /**
+ * Helper to execute an async function with retry for transient network errors
+ */
+async function withRetry(fn, retries = 2, delay = 800) {
+  let lastErr;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const isNetworkError = err.message && (
+        err.message.includes('fetch failed') ||
+        err.message.includes('ETIMEDOUT') ||
+        err.message.includes('ECONNRESET') ||
+        err.message.includes('socket hang up')
+      );
+      if (isNetworkError && i < retries - 1) {
+        console.warn(`[LLM Network Warning]: ${err.message}. Retrying attempt ${i + 2}/${retries}...`);
+        await new Promise(r => setTimeout(r, delay * (i + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
+/**
  * Unified LLM Provider Service
  * Supports Google Gemini, OpenAI, and Grok (xAI) via environment variables.
  */
@@ -20,30 +47,39 @@ export async function callLLM({ prompt, systemInstruction = '', provider = proce
 
       const genAI = new GoogleGenerativeAI(apiKey);
       const modelsToTry = [
-        process.env.GEMINI_MODEL || 'gemini-flash-latest',
-        'gemini-2.0-flash-lite',
-        'gemini-pro-latest',
+        process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite',
+        'gemini-1.5-flash-8b',
+        'gemini-flash-lite-latest',
+        'gemini-flash-latest',
         'gemini-2.0-flash'
       ];
 
       let lastError;
       for (const modelName of modelsToTry) {
         try {
-          const model = genAI.getGenerativeModel({
-            model: modelName,
-            systemInstruction: systemInstruction || undefined
-          });
+          return await withRetry(async () => {
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              systemInstruction: systemInstruction || undefined
+            });
 
-          const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature }
-          });
+            const result = await model.generateContent({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig: { temperature }
+            });
 
-          return result.response.text();
+            return result.response.text();
+          });
         } catch (err) {
           lastError = err;
-          if (err.message && (err.message.includes('404') || err.message.includes('no longer available'))) {
-            console.warn(`[Gemini Model ${modelName} unavailable]: Trying next model...`);
+          const isModelUnavailableOrQuota = err.message && (
+            err.message.includes('404') ||
+            err.message.includes('no longer available') ||
+            err.message.includes('429') ||
+            err.message.includes('Quota exceeded')
+          );
+          if (isModelUnavailableOrQuota) {
+            console.warn(`[Gemini Model ${modelName} unavailable/quota hit]: Trying next model...`);
             continue;
           }
           throw err;
@@ -63,19 +99,21 @@ export async function callLLM({ prompt, systemInstruction = '', provider = proce
       const openai = new OpenAI({ apiKey, baseURL });
       const model = selectedProvider === 'grok' ? 'grok-beta' : 'gpt-4o-mini';
 
-      const messages = [];
-      if (systemInstruction) {
-        messages.push({ role: 'system', content: systemInstruction });
-      }
-      messages.push({ role: 'user', content: prompt });
+      return await withRetry(async () => {
+        const messages = [];
+        if (systemInstruction) {
+          messages.push({ role: 'system', content: systemInstruction });
+        }
+        messages.push({ role: 'user', content: prompt });
 
-      const completion = await openai.chat.completions.create({
-        model,
-        messages,
-        temperature
+        const completion = await openai.chat.completions.create({
+          model,
+          messages,
+          temperature
+        });
+
+        return completion.choices[0]?.message?.content || '';
       });
-
-      return completion.choices[0]?.message?.content || '';
     }
 
     throw new Error(`Unsupported LLM provider requested: ${selectedProvider}`);
