@@ -1,14 +1,22 @@
 import React from 'react';
-import { Bot, LogIn } from 'lucide-react';
+import { Bot, LogIn, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
-export default function ChatHeader({ onOpenAuthModal }) {
+export default function ChatHeader({ sidebarOpen, onToggleSidebar, onOpenAuthModal }) {
   const { user } = useAuth();
 
   return (
     <div className="chat-header">
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {!user && <Bot size={24} color="#38bdf8" />}
+        {/* Toggle Sidebar Button for Logged-In User when collapsed */}
+        {user && !sidebarOpen && (
+          <button className="expand-sidebar-btn" onClick={onToggleSidebar} title="Open Sidebar">
+            <PanelLeftOpen size={20} />
+          </button>
+        )}
+
+        {(!user || !sidebarOpen) && <Bot size={24} color="#38bdf8" />}
+
         <span className="chat-title" style={{ fontSize: '1.15rem', fontWeight: 800 }}>
           Sabha<span style={{ color: '#818cf8' }}>.ai</span>
         </span>

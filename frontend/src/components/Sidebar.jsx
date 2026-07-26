@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Plus, MessageSquare, Trash2, LogIn, LogOut, Sun, Moon } from 'lucide-react';
+import { Bot, Plus, MessageSquare, Trash2, LogIn, LogOut, Sun, Moon, PanelLeftClose } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Sidebar({
@@ -7,6 +7,7 @@ export default function Sidebar({
   sessionId,
   theme,
   onToggleTheme,
+  onToggleSidebar,
   onNewChat,
   onSelectSession,
   onDeleteSession,
@@ -22,12 +23,17 @@ export default function Sidebar({
 
   return (
     <div className="sidebar">
-      {/* Brand Header */}
+      {/* Brand Header with Collapse Sidebar Button */}
       <div className="sidebar-header">
-        <Bot size={26} color="#38bdf8" />
-        <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.5px' }}>
-          Sabha<span style={{ color: '#818cf8' }}>.ai</span>
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Bot size={26} color="#38bdf8" />
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.5px' }}>
+            Sabha<span style={{ color: '#818cf8' }}>.ai</span>
+          </span>
+        </div>
+        <button className="collapse-sidebar-btn" onClick={onToggleSidebar} title="Close Sidebar">
+          <PanelLeftClose size={18} />
+        </button>
       </div>
 
       {/* New Session Button */}

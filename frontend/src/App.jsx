@@ -21,14 +21,16 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
 
-  // Theme State: Default 'light' for guest users, saved preference for logged-in users
+  // Collapsible Sidebar State (defaults to true for logged-in users)
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Theme State
   const [theme, setTheme] = useState(() => {
     const savedUser = localStorage.getItem('user');
     if (!savedUser) return 'light';
     return localStorage.getItem('theme') || 'dark';
   });
 
-  // Apply theme to <html> element
   useEffect(() => {
     if (!user) {
       document.documentElement.setAttribute('data-theme', 'light');
@@ -40,6 +42,10 @@ export default function App() {
 
   const handleToggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const handleToggleSidebar = () => {
+    setSidebarOpen(prev => !prev);
   };
 
   const abortControllerRef = useRef(null);
@@ -186,13 +192,14 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar Component */}
-      {user && (
+      {/* Sidebar Component (Only rendered for logged-in users when sidebarOpen is true) */}
+      {user && sidebarOpen && (
         <Sidebar
           sessions={sessions}
           sessionId={sessionId}
           theme={theme}
           onToggleTheme={handleToggleTheme}
+          onToggleSidebar={handleToggleSidebar}
           onNewChat={handleNewChat}
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
@@ -202,7 +209,11 @@ export default function App() {
 
       {/* Main Chat Content Area */}
       <div className={`main-chat-area ${isNewChat ? 'new-chat-mode' : ''}`}>
-        <ChatHeader onOpenAuthModal={() => setShowAuthModal(true)} />
+        <ChatHeader
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={handleToggleSidebar}
+          onOpenAuthModal={() => setShowAuthModal(true)}
+        />
 
         <ChatMessages
           messages={messages}

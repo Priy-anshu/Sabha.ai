@@ -70,9 +70,26 @@ body {
 .sidebar-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   margin-bottom: 1.25rem;
   padding: 0.25rem 0.5rem;
+}
+
+.collapse-sidebar-btn, .expand-sidebar-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.collapse-sidebar-btn:hover, .expand-sidebar-btn:hover {
+  color: var(--text-main);
+  background: var(--bg-card);
 }
 
 .new-chat-btn {
