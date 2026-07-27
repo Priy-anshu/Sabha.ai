@@ -32,8 +32,46 @@ async function withRetry(fn, retries = 2, delay = 800) {
 }
 
 /**
+ * Call Groq API (High Speed, 14,400 RPD Free Tier)
+ */
+async function callGroq({ prompt, systemInstruction, temperature }) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey.includes('your_')) {
+    throw new Error('GROQ_API_KEY is not configured in backend/.env');
+  }
+
+  const openai = new OpenAI({ apiKey, baseURL: 'https://api.groq.com/openai/v1' });
+  const groqModels = ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'gemma2-9b-it'];
+
+  let lastErr;
+  for (const model of groqModels) {
+    try {
+      return await withRetry(async () => {
+        const messages = [];
+        if (systemInstruction) {
+          messages.push({ role: 'system', content: systemInstruction });
+        }
+        messages.push({ role: 'user', content: prompt });
+
+        const completion = await openai.chat.completions.create({
+          model,
+          messages,
+          temperature
+        });
+
+        return completion.choices[0]?.message?.content || '';
+      });
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[Groq Model ${model} Warning]: ${err.message}. Trying next Groq model...`);
+    }
+  }
+  throw lastErr;
+}
+
+/**
  * Unified LLM Provider Service
- * Supports Google Gemini, OpenAI, and Grok (xAI) via environment variables.
+ * Supports Google Gemini (with 500 RPD Lite models priority), Groq (14,400 RPD fallback), OpenAI, and Grok (xAI).
  */
 export async function callLLM({ prompt, systemInstruction = '', provider = process.env.DEFAULT_PROVIDER || 'gemini', temperature = 0.7 }) {
   const selectedProvider = provider.toLowerCase();
@@ -46,11 +84,18 @@ export async function callLLM({ prompt, systemInstruction = '', provider = proce
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
+
+      // Prioritize High-Quota 500 RPD Lite models first so tokens stay longer!
       const modelsToTry = [
-        process.env.GEMINI_MODEL || 'gemini-2.0-flash',
-        'gemini-flash-latest',
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-2.5-flash-lite',
         'gemini-2.0-flash-lite',
-        'gemini-flash-lite-latest'
+        'gemini-flash-lite-latest',
+        'gemini-3.5-flash',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-flash-latest'
       ];
 
       let lastError;
@@ -75,16 +120,28 @@ export async function callLLM({ prompt, systemInstruction = '', provider = proce
             err.message.includes('404') ||
             err.message.includes('no longer available') ||
             err.message.includes('429') ||
-            err.message.includes('Quota exceeded')
+            err.message.includes('Quota exceeded') ||
+            err.message.includes('RESOURCE_EXHAUSTED')
           );
           if (isModelUnavailableOrQuota) {
-            console.warn(`[Gemini Model ${modelName} unavailable/quota hit]: Trying next model...`);
+            console.warn(`[Gemini Model ${modelName} Quota Exceeded]: Switching to next available Gemini model...`);
             continue;
           }
           throw err;
         }
       }
+
+      // If ALL Gemini models hit rate limit or fail, fallback to Groq (14,400 RPD limit)!
+      if (process.env.GROQ_API_KEY) {
+        console.warn('⚠️ All Gemini models exhausted. Switching to Groq AI Fallback...');
+        return await callGroq({ prompt, systemInstruction, temperature });
+      }
+
       throw lastError;
+    }
+
+    if (selectedProvider === 'groq') {
+      return await callGroq({ prompt, systemInstruction, temperature });
     }
 
     if (selectedProvider === 'openai' || selectedProvider === 'grok') {

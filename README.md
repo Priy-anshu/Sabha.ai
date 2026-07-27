@@ -108,9 +108,12 @@ MONGO_URI=your_mongodb_atlas_connection_string
 JWT_SECRET=your_jwt_secret_key
 GEMINI_API_KEY=your_google_gemini_api_key
 DEFAULT_PROVIDER=gemini
+GROQ_API_KEY=gsk_your_groq_api_key
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_gmail_app_password
 ```
+
+*(Refer to `backend/.env.example` for a ready-to-use configuration template.)*
 
 Start the backend server:
 ```bash
