@@ -3,6 +3,7 @@ import { ChatSession } from '../models/ChatSession.js';
 import { ChatDetails } from '../models/ChatDetails.js';
 import { ChatDocs } from '../models/ChatDocs.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { generateChatTitle } from '../services/personaAllocator.js';
 
 const router = express.Router();
 
@@ -64,7 +65,14 @@ router.post('/save', protect, async (req, res) => {
       return res.status(400).json({ success: false, error: 'sessionId is required' });
     }
 
-    const title = (messages && messages.find(m => m.sender === 'user')?.text?.slice(0, 30)) || 'New Chat';
+    // Check if session already exists to preserve custom title
+    let existingSession = await ChatSession.findOne({ sessionId });
+    let title = existingSession?.title;
+
+    if (!title || title === 'New Chat' || title === 'New Conversation') {
+      const firstUserMsg = messages && messages.find(m => m.sender === 'user')?.text;
+      title = await generateChatTitle(firstUserMsg);
+    }
 
     // 1. Update ChatSession metadata
     const session = await ChatSession.findOneAndUpdate(

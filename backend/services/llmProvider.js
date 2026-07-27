@@ -47,11 +47,10 @@ export async function callLLM({ prompt, systemInstruction = '', provider = proce
 
       const genAI = new GoogleGenerativeAI(apiKey);
       const modelsToTry = [
-        process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite',
-        'gemini-1.5-flash-8b',
-        'gemini-flash-lite-latest',
+        process.env.GEMINI_MODEL || 'gemini-2.0-flash',
         'gemini-flash-latest',
-        'gemini-2.0-flash'
+        'gemini-2.0-flash-lite',
+        'gemini-flash-lite-latest'
       ];
 
       let lastError;

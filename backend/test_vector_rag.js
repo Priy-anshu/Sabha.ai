@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { cosineSimilarity } from './services/ragService.js';
+import { generateChatTitle } from './services/personaAllocator.js';
 
 dotenv.config();
 
@@ -24,9 +25,22 @@ async function testEmbeddingModels() {
   return null;
 }
 
+async function testTitleGenerator() {
+  console.log('\n🏷️ Testing 3-4 Word Chat Title Generator...');
+  const prompt1 = 'How do I configure MongoDB Atlas with Node.js and Express?';
+  const prompt2 = 'What are the best security practices for JWT authentication in React apps?';
+
+  const title1 = await generateChatTitle(prompt1);
+  const title2 = await generateChatTitle(prompt2);
+
+  console.log(`Prompt 1: "${prompt1}" ➔ Title: "${title1}"`);
+  console.log(`Prompt 2: "${prompt2}" ➔ Title: "${title2}"`);
+}
+
 async function runTest() {
   console.log('🧪 Testing Google Vector Generation & Cosine Similarity...');
   const workingModel = await testEmbeddingModels();
+  await testTitleGenerator();
 
   if (!workingModel) {
     console.error('❌ No working embedding model found.');

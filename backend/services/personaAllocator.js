@@ -201,3 +201,33 @@ JSON SCHEMA REQUIREMENT:
     return { personas: defaultPersonas, count: 3, temperature };
   }
 }
+
+/**
+ * Generates a clean 3 to 4 word topic title for sidebar navigation
+ */
+export async function generateChatTitle(userPrompt) {
+  if (!userPrompt || typeof userPrompt !== 'string' || userPrompt.trim().length === 0) {
+    return 'New Conversation';
+  }
+
+  const cleanPrompt = userPrompt.trim();
+  const words = cleanPrompt.split(/\s+/);
+  if (words.length <= 4) {
+    return words.join(' ').replace(/[^a-zA-Z0-9\s]/g, '');
+  }
+
+  try {
+    const rawTitle = await callLLM({
+      prompt: `[USER PROMPT]: "${cleanPrompt}"\n\nGenerate a clean, concise 3 to 4 word title for this chat topic. Return ONLY the 3-4 word title text without any quotes or markdown punctuation.`,
+      systemInstruction: 'You are a chat topic title generator. Output clean, concise 3 to 4 word titles.',
+      temperature: 0.3
+    });
+
+    let cleanTitle = rawTitle.trim().replace(/^["']|["']$/g, '').replace(/[\n\r]/g, '');
+    if (cleanTitle.endsWith('.')) cleanTitle = cleanTitle.slice(0, -1);
+
+    return cleanTitle || words.slice(0, 4).join(' ');
+  } catch (err) {
+    return words.slice(0, 4).join(' ');
+  }
+}
