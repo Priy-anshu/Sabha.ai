@@ -83,36 +83,77 @@ export async function allocatePersonas(inputParam, existingPersonasParam = [], p
     return { personas: casualPersonas, count: 1, temperature: 0.7 };
   }
 
-  // 2. DOMAIN / TECHNICAL QUERY: If existing team fits topic, re-use it. Otherwise allocate/adapt personas.
+  // 2. DOMAIN / TECHNICAL QUERY: Perform deep domain analysis & allocate specialized expert personas
   const temperature = detectTemperature(userPrompt);
   const existingNames = existingPersonas.map(p => p.name);
 
-  const systemInstruction = `You are an expert AI Multi-Agent System Coordinator.
-Your task is to analyze the user prompt and determine specialized expert personas best suited to solve it.
+  const BEHAVIOR_PROMPT_MAP = {
+    no_sugarcoating: "Blunt, direct & unfiltered without polite fluff",
+    strict: "Strict & rigorous, calling out logical fallacies and edge cases",
+    analytical: "Clinical, data-driven, and objective",
+    first_principles: "Deconstructs down to fundamental truths",
+    devils_advocate: "Actively challenges assumptions and finds hidden risks",
+    skeptical: "Questions unproven claims and demands proof",
+    edge_case_obsessed: "Obsessed with failure modes and race conditions",
+    security_focused: "Prioritizes zero-trust security and data privacy",
+    pragmatic: "Pragmatic & minimalist, focusing on simple execution",
+    code_purist: "Strict clean code & design pattern adherence",
+    concise: "Ultra-concise with short bullet points",
+    system_architect: "High-level system scalability focus",
+    friendly: "Warm, encouraging, and polite",
+    mentor: "Educational with clear analogies",
+    socratic: "Uses Socratic guiding questions",
+    creative: "Visionary & out-of-the-box brainstorming",
+    serious: "Formal executive corporate tone",
+    sarcastic: "Witty & sarcastic with dry humor"
+  };
 
-DYNAMIC PERSONA NUMBER SCALING:
-- Moderate complexity ➔ Allocate 3 personas.
-- High complexity / multi-faceted ➔ Allocate 4 or 5 personas.
+  const selectedBehaviorDirectives = Array.isArray(behaviors)
+    ? behaviors.map(b => BEHAVIOR_PROMPT_MAP[b]).filter(Boolean).map(d => `- ${d}`).join('\n')
+    : '';
 
-RULES:
-1. SESSION PERSISTENCE: If the existing personas (${JSON.stringify(existingNames)}) already cover the topic, RETURN THE SAME PERSONAS without changing their names.
-2. ADAPTATION: Only add a new persona if a completely new domain is introduced. Only remove a persona if the topic simplified.
-3. NAMING: Assign diverse Indian human names paired with titles (e.g. "Kabir (System Architect)", "Ananya (UX Designer)", "Aarav (Security Auditor)").
-4. Mindset instructions must be generic (e.g. "Critique the previous solution for flaws and suggest new improvements").
-5. Respond ONLY with a valid JSON array of objects. No markdown formatting (\`\`\`json).
+  const systemInstruction = `You are the Lead Multi-Agent Council Coordinator for Sabha.ai.
+Your mission is to perform deep domain analysis on the user prompt and construct an elite, highly-specialized team of expert personas tailored specifically to solve, critique, and audit this exact topic.
+
+CRITICAL ALLOCATION PROTOCOL (DO NOT HURRY OR USE GENERIC TITLES):
+1. DEEP DOMAIN ANALYSIS:
+   - Identify the exact technical, creative, or analytical domain (e.g., Distributed Databases, Frontend State Management, Cybersecurity, Financial Fraud, Legal Compliance, Bio-Tech, Creative Writing).
+   - Identify hidden edge cases, security risks, scalability bottlenecks, or user experience trade-offs implicit in the request.
+
+2. ADVERSARIAL TEAM COMPOSITION:
+   - Moderate complexity ➔ Allocate 3 specialized personas.
+   - High complexity / multi-faceted ➔ Allocate 4 or 5 specialized personas.
+   - Ensure the team forms a balanced, complementary triad:
+     * Primary Domain Architect (Builds the core initial foundation)
+     * Adversarial Auditor / Security & Edge-Case Lead (Attacks flaws, race conditions, and edge cases)
+     * Pragmatic Operational / UX Specialist (Focuses on real-world execution, simplicity, and performance)
+
+3. SPECIFICITY & HIGH-VALUE NAMING:
+   - NEVER use generic titles like "Technical Lead", "Developer", or "Assistant".
+   - MUST use sharp, highly specialized titles (e.g., "Kabir (Distributed Systems & Consensus Specialist)", "Ananya (Zero-Trust Security & API Auditor)", "Diya (UI/UX Performance Lead)").
+   - Pair each specialist title with a distinct, easily pronounceable Indian name.
+
+4. SHARP, DOMAIN-SPECIFIC MINDSETS:
+   - Give each persona a razor-sharp, actionable mindset focused on their exact domain responsibilities.
+${selectedBehaviorDirectives ? `\n5. INCORPORATE USER BEHAVIOR DIRECTIVES:\nAll allocated personas MUST embody these behavior traits:\n${selectedBehaviorDirectives}\n` : ''}
+6. SESSION PERSISTENCE:
+   - If existing personas (${JSON.stringify(existingNames)}) already match the domain topic, PRESERVE their names and adapt their specialized focus without resetting them.
+
+7. OUTPUT FORMAT:
+   - Respond ONLY with a valid JSON array of persona objects. No markdown formatting (\`\`\`json).
 
 JSON SCHEMA REQUIREMENT:
 [
   {
     "id": "persona_1",
-    "name": "IndianName (Expert Title)",
-    "role": "Brief 1-sentence description of their specialized perspective",
-    "mindset": "Generic instruction on what flaws to look out for and how to critique previous outputs"
+    "name": "IndianName (Highly Specialized Domain Title)",
+    "role": "Exact 1-sentence specialization in relation to the user prompt",
+    "mindset": "Specific critical instructions on what domain flaws, edge cases, or optimizations to inspect"
   }
 ]`;
 
   const rawResponse = await callLLM({
-    prompt: `User Prompt: "${userPrompt}"\nExisting Personas: ${JSON.stringify(existingNames)}\n\nAnalyze topic and allocate 3, 4, or 5 specialized personas with distinct Indian names.`,
+    prompt: `[USER PROMPT TO ANALYZE]:\n"${userPrompt}"\n\n[EXISTING SESSION PERSONAS]:\n${JSON.stringify(existingNames)}\n\nPerform deep domain analysis and allocate the optimal 3, 4, or 5 specialized Indian-named expert personas.`,
     systemInstruction,
     provider,
     temperature

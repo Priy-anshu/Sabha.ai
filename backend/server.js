@@ -6,7 +6,7 @@ import { callLLM } from './services/llmProvider.js';
 import { allocatePersonas } from './services/personaAllocator.js';
 import { runDebate } from './services/debateEngine.js';
 import { runDualVerification } from './services/dualVerifier.js';
-import { extractTextFromFile, chunkText, retrieveRelevantContext } from './services/ragService.js';
+import { extractTextFromFile, chunkText, retrieveRelevantContext, generateEmbeddingsForChunks } from './services/ragService.js';
 import { connectDB } from './config/db.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -82,6 +82,7 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
       console.log(`📄 Processing attached file for user ${req.user.email}: ${attachedFileName}`);
       const rawText = await extractTextFromFile(req.file);
       const chunks = chunkText(rawText);
+      const embeddings = await generateEmbeddingsForChunks(chunks);
 
       // Save document into ChatDocs model
       const docId = 'doc_' + Date.now();
@@ -91,10 +92,11 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
         fileName: attachedFileName,
         mimeType: req.file.mimetype,
         rawText,
-        chunks
+        chunks,
+        embeddings
       });
 
-      documentContext = retrieveRelevantContext(chunks, prompt || 'Summary', rawText);
+      documentContext = await retrieveRelevantContext(chunks, prompt || 'Summary', rawText, embeddings);
     } else if (sessionId && !isGuestUser) {
       // Step RAG 2: Check ChatDocs memory for logged-in user
       const existingDocs = await ChatDocs.find({ sessionId }).sort({ uploadedAt: -1 });
@@ -102,7 +104,7 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
         const latestDoc = existingDocs[0];
         attachedFileName = latestDoc.fileName;
         console.log(`🧠 Reusing stored ChatDoc memory for session ${sessionId}: ${attachedFileName}`);
-        documentContext = retrieveRelevantContext(latestDoc.chunks, prompt, latestDoc.rawText);
+        documentContext = await retrieveRelevantContext(latestDoc.chunks, prompt, latestDoc.rawText, latestDoc.embeddings);
       }
     }
 
