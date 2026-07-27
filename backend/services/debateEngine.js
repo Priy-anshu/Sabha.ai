@@ -31,7 +31,7 @@ function buildBehaviorPrompt(behaviors = []) {
 /**
  * Step B: Sequential Adversarial Debate Loop with RAG Document Context Support & Behavior Directives
  */
-export async function runDebate({ userPrompt, personas, provider = 'gemini', documentContext = '', behaviors = [], chatMemoryPrompt = '' }) {
+export async function runDebate({ userPrompt, personas, provider = 'gemini', documentContext = '', behaviors = [], chatMemoryPrompt = '', onProgress }) {
   if (!personas || personas.length === 0) {
     throw new Error('No personas provided for debate');
   }
@@ -48,6 +48,15 @@ export async function runDebate({ userPrompt, personas, provider = 'gemini', doc
   // Handle single-persona casual chat bypass
   if (personas.length === 1) {
     const singlePersona = personas[0];
+    if (onProgress) {
+      onProgress({
+        title: `${singlePersona.name} (${singlePersona.role}) Responding...`,
+        detail: 'Direct assistant response mode',
+        status: 'in_progress',
+        activePersona: singlePersona.name
+      });
+    }
+
     const systemPrompt = `You are ${singlePersona.name}, acting in the role of ${singlePersona.role}.
 Mindset: ${singlePersona.mindset}.${behaviorDirectives}
 Use any attached document context if provided to answer the user warmly and accurately. Use markdown bullet points (- ) for sub-items.`;
@@ -58,6 +67,14 @@ Use any attached document context if provided to answer the user warmly and accu
       provider,
       temperature: 0.7
     });
+
+    if (onProgress) {
+      onProgress({
+        title: `${singlePersona.name} Response Complete`,
+        detail: singleResponse.slice(0, 150) + '...',
+        status: 'completed'
+      });
+    }
 
     return {
       consensus: singleResponse,
@@ -77,6 +94,15 @@ Use any attached document context if provided to answer the user warmly and accu
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     finalRoundReached = round;
     console.log(`🗣️ Starting Debate Round ${round}/${MAX_ROUNDS}...`);
+
+    if (onProgress) {
+      onProgress({
+        title: `Round ${round}/${MAX_ROUNDS}: ${persona1.name} (${persona1.role}) ${round === 1 ? 'Formulating Initial Solution' : 'Refining Solution'}`,
+        detail: round === 1 ? 'Analyzing user request & architectural requirements...' : 'Incorporating feedback from prior persona critiques...',
+        status: 'in_progress',
+        activePersona: persona1.name
+      });
+    }
 
     // Step A: Persona 1 Proposes / Refines Solution
     if (round === 1) {
@@ -121,10 +147,28 @@ Review the critiques from other personas. Update and refine your proposal to add
       });
     }
 
+    if (onProgress) {
+      onProgress({
+        title: `Round ${round}: ${persona1.name} ${round === 1 ? 'Submitted Proposal' : 'Updated Refined Proposal'}`,
+        detail: currentProposal.slice(0, 180) + '...',
+        status: 'completed'
+      });
+    }
+
     // Step B: Remaining Personas Review & Cast Vote (AGREED or DISAGREED)
     let roundDissenters = 0;
     for (let i = 1; i < personas.length; i++) {
       const p = personas[i];
+
+      if (onProgress) {
+        onProgress({
+          title: `Round ${round}: ${p.name} (${p.role}) Auditing & Voting`,
+          detail: `Inspecting proposal for edge cases and security vulnerabilities...`,
+          status: 'in_progress',
+          activePersona: p.name
+        });
+      }
+
       const critiqueInstruction = `You are ${p.name} (${p.role}).
 Mindset: ${p.mindset}.${behaviorDirectives}
 
@@ -153,12 +197,27 @@ Below the status line, provide your concise feedback (100-150 words) using markd
         output: deltaOutput,
         vote: isAgreed ? 'AGREED' : 'DISAGREED'
       });
+
+      if (onProgress) {
+        onProgress({
+          title: `Round ${round}: ${p.name} Voted [${isAgreed ? 'STATUS: AGREED' : 'STATUS: DISAGREED'}]`,
+          detail: deltaOutput.slice(0, 180) + '...',
+          status: 'completed'
+        });
+      }
     }
 
     // Check if Unanimous Agreement was reached in this round
     if (roundDissenters === 0) {
       console.log(`🎉 Unanimous Consensus reached by all personas in Round ${round}!`);
       consensusReached = true;
+      if (onProgress) {
+        onProgress({
+          title: `🎉 Unanimous Consensus Reached in Round ${round}!`,
+          detail: 'All personas explicitly approved the refined proposal.',
+          status: 'completed'
+        });
+      }
       break;
     }
   }
@@ -167,6 +226,13 @@ Below the status line, provide your concise feedback (100-150 words) using markd
   let votingSummary = '';
   if (!consensusReached) {
     console.log('⚖️ Unanimous agreement not reached after 3 rounds. Triggering Fallback Majority Voting Loop...');
+    if (onProgress) {
+      onProgress({
+        title: `⚖️ Triggering Fallback Majority Voting Loop`,
+        detail: '3 rounds completed without 100% agreement. Collecting final ballots...',
+        status: 'in_progress'
+      });
+    }
 
     const votes = [];
     for (const p of personas) {
@@ -186,6 +252,14 @@ List 1 key reason for your vote.`;
       votes.push(`${p.name} (${p.role}): ${voteOutput}`);
     }
     votingSummary = `\n\nFALLBACK MAJORITY VOTING SUMMARY:\n${votes.join('\n')}`;
+
+    if (onProgress) {
+      onProgress({
+        title: `Majority Ballots Collected`,
+        detail: votes.join('\n'),
+        status: 'completed'
+      });
+    }
   }
 
   // Step 4: Final Master Synthesizer Agent

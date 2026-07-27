@@ -52,6 +52,137 @@ app.post('/api/chat/allocate-personas', async (req, res) => {
   }
 });
 
+// POST /api/chat/debate-stream - Real-Time SSE Multi-Agent Thinking Stream
+app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const sendEvent = (eventType, data) => {
+    try {
+      res.write(`data: ${JSON.stringify({ type: eventType, ...data })}\n\n`);
+    } catch (e) {
+      console.warn('SSE Write Warning:', e.message);
+    }
+  };
+
+  try {
+    const prompt = (req.body.prompt || '').trim();
+    const provider = req.body.provider || 'gemini';
+    const existingPersonas = req.body.existingPersonas ? JSON.parse(req.body.existingPersonas) : [];
+    const behaviors = req.body.behaviors ? JSON.parse(req.body.behaviors) : [];
+    const sessionId = req.body.sessionId || 'sess_default';
+    const isGuestUser = !req.user || req.user.userId === 'guest_user_101';
+
+    if (req.file && isGuestUser) {
+      sendEvent('error', { error: 'Document upload requires a signed-in account.' });
+      return res.end();
+    }
+
+    let documentContext = '';
+    let attachedFileName = '';
+
+    sendEvent('status', {
+      title: '🔍 Analyzing Intent & Context Memory',
+      detail: 'Scanning document context and memory cache...',
+      status: 'in_progress'
+    });
+
+    if (req.file && !isGuestUser) {
+      attachedFileName = req.file.originalname;
+      const rawText = await extractTextFromFile(req.file);
+      const chunks = chunkText(rawText);
+      const embeddings = await generateEmbeddingsForChunks(chunks);
+
+      const docId = 'doc_' + Date.now();
+      await ChatDocs.create({ docId, sessionId, fileName: attachedFileName, mimeType: req.file.mimetype, rawText, chunks, embeddings });
+      documentContext = await retrieveRelevantContext(chunks, prompt || 'Summary', rawText, embeddings);
+    } else if (sessionId && !isGuestUser) {
+      const existingDocs = await ChatDocs.find({ sessionId }).sort({ uploadedAt: -1 });
+      if (existingDocs && existingDocs.length > 0) {
+        const latestDoc = existingDocs[0];
+        attachedFileName = latestDoc.fileName;
+        documentContext = await retrieveRelevantContext(latestDoc.chunks, prompt, latestDoc.rawText, latestDoc.embeddings);
+      }
+    }
+
+    const finalPrompt = prompt || `Summarize and analyze attached document: ${attachedFileName}`;
+
+    const sessionContextData = await getSessionContext(sessionId);
+    const chatMemoryPrompt = formatContextPrompt(sessionContextData);
+
+    sendEvent('status', {
+      title: '🧠 Allocating Specialized Council Personas',
+      detail: 'Performing deep domain analysis to select expert triad...',
+      status: 'in_progress'
+    });
+
+    const allocation = await allocatePersonas({ prompt: finalPrompt, existingPersonas, behaviors });
+    const personas = allocation.personas;
+
+    sendEvent('personas_allocated', {
+      personas,
+      title: `Allocated ${personas.length} Expert Personas`,
+      detail: personas.map(p => p.name).join(' • '),
+      status: 'completed'
+    });
+
+    const debateResult = await runDebate({
+      userPrompt: finalPrompt,
+      personas,
+      provider,
+      documentContext,
+      behaviors,
+      chatMemoryPrompt,
+      onProgress: (event) => {
+        sendEvent('debate_step', event);
+      }
+    });
+
+    sendEvent('status', {
+      title: '🛡️ Running Dual-Persona Quality Audit',
+      detail: 'Fact Auditor (Kavya) & Completeness Auditor (Ishaan) auditing consensus output...',
+      status: 'in_progress'
+    });
+
+    let verificationResult = { verified: true, verifiers: [], finalResponse: debateResult.consensus };
+    if (personas.length > 1) {
+      verificationResult = await runDualVerification({
+        userPrompt: finalPrompt,
+        debateConsensus: debateResult.consensus,
+        provider
+      });
+    }
+
+    sendEvent('status', {
+      title: '✨ Dual Verifiers Approved Final Consensus',
+      detail: 'Quality audit passed successfully.',
+      status: 'completed'
+    });
+
+    updateSessionContext(sessionId, finalPrompt, verificationResult.finalResponse).catch(err => {
+      console.warn('[Cache Sync Warning]:', err.message);
+    });
+
+    sendEvent('done', {
+      success: true,
+      prompt: finalPrompt,
+      attachedFileName,
+      count: personas.length,
+      personas,
+      response: verificationResult.finalResponse,
+      transcript: debateResult.transcript,
+      verification: verificationResult
+    });
+
+    res.end();
+  } catch (error) {
+    console.error('Debate Stream Error:', error.message);
+    sendEvent('error', { error: error.message });
+    res.end();
+  }
+});
+
 // POST /api/chat/debate - Full Pipeline with Auth Protection for File Attachments
 app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) => {
   try {

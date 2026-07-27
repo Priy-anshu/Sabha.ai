@@ -6,7 +6,7 @@ import ChatInput from './components/ChatInput.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import InspectionModal from './components/InspectionModal.jsx';
 import { getSessions, getSessionById, saveSession, deleteSession } from './api/sessionApi.js';
-import { sendDebatePrompt } from './api/chatApi.js';
+import { sendDebatePrompt, sendDebatePromptStream } from './api/chatApi.js';
 import { useAuth } from './context/AuthContext.jsx';
 
 export default function App() {
@@ -15,6 +15,8 @@ export default function App() {
   const [sessions, setSessions] = useState([]);
   const [messages, setMessages] = useState([]);
   const [activePersonas, setActivePersonas] = useState([]);
+  const [liveSteps, setLiveSteps] = useState([]);
+  const [activePersona, setActivePersona] = useState(null);
   const [input, setInput] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -100,12 +102,16 @@ export default function App() {
     setSessionId(newId);
     setMessages([]);
     setActivePersonas([]);
+    setLiveSteps([]);
+    setActivePersona(null);
     setAttachedFile(null);
     setLoading(false);
   };
 
   const handleSelectSession = async (sId) => {
     try {
+      setLiveSteps([]);
+      setActivePersona(null);
       const data = await getSessionById(sId);
       if (data.success && data.session) {
         setSessionId(data.session.sessionId);
@@ -158,47 +164,100 @@ export default function App() {
     const currentFile = attachedFile;
     setInput('');
     setAttachedFile(null);
+    setLiveSteps([]);
+    setActivePersona(null);
     setLoading(true);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     try {
-      const debateData = await sendDebatePrompt({
+      let isStreamFinished = false;
+
+      await sendDebatePromptStream({
         prompt: currentInput,
         file: currentFile,
         existingPersonas: activePersonas,
         behaviors: selectedBehaviors,
         sessionId,
-        signal: controller.signal
+        signal: controller.signal,
+        onEvent: async (event) => {
+          if (event.type === 'status' || event.type === 'debate_step' || event.type === 'personas_allocated') {
+            setLiveSteps(prev => [
+              ...prev,
+              {
+                title: event.title,
+                detail: event.detail,
+                status: event.status || 'in_progress',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+            ]);
+            if (event.activePersona) setActivePersona(event.activePersona);
+          }
+
+          if (event.type === 'personas_allocated' && event.personas) {
+            setActivePersonas(event.personas);
+          }
+
+          if (event.type === 'done') {
+            isStreamFinished = true;
+            setActivePersonas(event.personas);
+            const aiMsg = {
+              id: String(Date.now() + 1),
+              sender: 'ai',
+              text: event.response,
+              personas: event.personas,
+              transcript: event.transcript,
+              verification: event.verification
+            };
+            const finalMessages = [...updatedMessages, aiMsg];
+            setMessages(finalMessages);
+
+            if (user) {
+              await saveSession({
+                sessionId,
+                activePersonas: event.personas,
+                messages: finalMessages
+              });
+              fetchSessionsList();
+            }
+          }
+        }
       });
 
-      if (debateData.success) {
-        setActivePersonas(debateData.personas);
-        const aiMsg = {
-          id: String(Date.now() + 1),
-          sender: 'ai',
-          text: debateData.response,
-          personas: debateData.personas,
-          transcript: debateData.transcript,
-          verification: debateData.verification
-        };
-        const finalMessages = [...updatedMessages, aiMsg];
-        setMessages(finalMessages);
+      if (!isStreamFinished) {
+        // Fallback to standard request if stream didn't receive done event
+        const debateData = await sendDebatePrompt({
+          prompt: currentInput,
+          file: currentFile,
+          existingPersonas: activePersonas,
+          behaviors: selectedBehaviors,
+          sessionId,
+          signal: controller.signal
+        });
 
-        if (user) {
-          await saveSession({
-            sessionId,
-            activePersonas: debateData.personas,
-            messages: finalMessages
-          });
-          fetchSessionsList();
+        if (debateData.success) {
+          setActivePersonas(debateData.personas);
+          const aiMsg = {
+            id: String(Date.now() + 1),
+            sender: 'ai',
+            text: debateData.response,
+            personas: debateData.personas,
+            transcript: debateData.transcript,
+            verification: debateData.verification
+          };
+          const finalMessages = [...updatedMessages, aiMsg];
+          setMessages(finalMessages);
+
+          if (user) {
+            await saveSession({
+              sessionId,
+              activePersonas: debateData.personas,
+              messages: finalMessages
+            });
+            fetchSessionsList();
+          }
         }
-      } else {
-        setMessages(prev => [
-          ...prev,
-          { id: String(Date.now() + 1), sender: 'ai', text: `Error: ${debateData.error}`, personas: activePersonas }
-        ]);
       }
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -247,6 +306,8 @@ export default function App() {
         <ChatMessages
           messages={messages}
           loading={loading}
+          liveSteps={liveSteps}
+          activePersona={activePersona}
           onInspectModal={setModalData}
           onSelectSuggestion={(suggestionText) => {
             setInput(suggestionText);

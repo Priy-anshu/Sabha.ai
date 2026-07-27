@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bot, ShieldCheck, Users, Eye, Check, Copy, Sparkles, ShieldAlert, Cpu, FileText, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../context/AuthContext.jsx';
+import LiveThinkingCard from './LiveThinkingCard.jsx';
 
 // Component for rendering user prompt text with Copy button & "Show More / Show Less" after 3 lines
 function ExpandableUserText({ text, msgId, onCopy, isCopied }) {
@@ -51,13 +52,17 @@ function ExpandableUserText({ text, msgId, onCopy, isCopied }) {
 export default function ChatMessages({
   messages = [],
   loading,
+  liveSteps = [],
+  activePersona = null,
   onInspectModal,
   onSelectSuggestion
 }) {
   const { user } = useAuth();
   const [copiedId, setCopiedId] = useState(null);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [userHasScrolledUp, setUserHasScrolledUp] = useState(false);
   const scrollTimeoutRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const handleCopy = (id, text) => {
     navigator.clipboard.writeText(text);
@@ -65,8 +70,15 @@ export default function ChatMessages({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Scroll detection to temporarily show scrollbar and hide it when scrolling stops
-  const handleScroll = () => {
+  // Smart Auto-scroll: Only scroll down if user hasn't manually scrolled up to read earlier steps
+  useEffect(() => {
+    if (!userHasScrolledUp) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, loading, liveSteps, userHasScrolledUp]);
+
+  // Scroll detection to handle manual user scrolling and scrollbar visibility
+  const handleScroll = (e) => {
     setIsScrolling(true);
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
@@ -74,6 +86,15 @@ export default function ChatMessages({
     scrollTimeoutRef.current = setTimeout(() => {
       setIsScrolling(false);
     }, 1000);
+
+    // Detect if user manually scrolled up away from bottom (> 60px)
+    const target = e.target;
+    const isAtBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 60;
+    if (isAtBottom) {
+      setUserHasScrolledUp(false);
+    } else {
+      setUserHasScrolledUp(true);
+    }
   };
 
   const suggestions = [
@@ -190,8 +211,17 @@ export default function ChatMessages({
           </div>
         ))}
 
-        {/* Immediate Pulsing Loading Indicator Bubble */}
-        {loading && (
+        {/* Real-Time Live Thinking Process Card Stream */}
+        {liveSteps && liveSteps.length > 0 && (
+          <LiveThinkingCard
+            steps={liveSteps}
+            isFinished={!loading}
+            activePersona={activePersona}
+          />
+        )}
+
+        {/* Immediate Pulsing Loading Indicator Bubble if no steps yet */}
+        {loading && (!liveSteps || liveSteps.length === 0) && (
           <div className="message-bubble ai-message">
             <div className="message-sender-header" style={{ marginBottom: '0.25rem' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -201,10 +231,26 @@ export default function ChatMessages({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontStyle: 'italic', color: 'var(--text-muted)' }}>
               <Sparkles size={16} className="spin-icon" color="#38bdf8" />
-              Debating & auditing consensus...
+              Initializing multi-agent council...
             </div>
           </div>
         )}
+
+        {/* Floating Scroll to Bottom Button when user scrolls up */}
+        {userHasScrolledUp && (
+          <button
+            className="scroll-bottom-btn"
+            onClick={() => {
+              setUserHasScrolledUp(false);
+              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          >
+            <ChevronDown size={14} /> Jump to latest step
+          </button>
+        )}
+
+        {/* Invisible Ref Anchor for Smooth Auto-Scroll */}
+        <div ref={messagesEndRef} />
       </div>
     </div>
   );
