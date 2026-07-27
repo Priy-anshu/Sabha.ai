@@ -70,7 +70,18 @@ export default function ChatMessages({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Smart Auto-scroll: Only scroll down if user hasn't manually scrolled up to read earlier steps
+  const prevMessagesLengthRef = useRef(messages.length);
+
+  // Force scroll to bottom on new prompt submission from anywhere on screen
+  useEffect(() => {
+    if (messages.length > prevMessagesLengthRef.current) {
+      setUserHasScrolledUp(false);
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevMessagesLengthRef.current = messages.length;
+  }, [messages.length]);
+
+  // Smart Auto-scroll during streaming: Only scroll down if user hasn't manually scrolled up
   useEffect(() => {
     if (!userHasScrolledUp) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
