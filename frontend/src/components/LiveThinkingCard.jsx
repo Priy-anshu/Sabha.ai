@@ -1,35 +1,40 @@
 import React, { useState, useEffect } from 'react';
 
-// Smooth Typewriter Text component that types out streaming text smoothly
-function SmoothTypewriterText({ text, speed = 15 }) {
-  const [displayedText, setDisplayedText] = useState('');
+// Line-by-line Typewriter Text component (Types out text line by line from left to right smoothly)
+function LineByLineTypewriterText({ text, lineDelay = 60, charSpeed = 8 }) {
+  const lines = React.useMemo(() => (text || '').split('\n'), [text]);
+  const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const [currentCharIndex, setCurrentCharIndex] = useState(0);
 
   useEffect(() => {
-    if (!text) {
-      setDisplayedText('');
-      return;
-    }
+    if (lines.length === 0) return;
 
-    // If text is short or already rendered, update directly
-    if (text.length <= displayedText.length) {
-      setDisplayedText(text);
-      return;
-    }
-
-    let i = displayedText.length;
-    const interval = setInterval(() => {
-      if (i < text.length) {
-        setDisplayedText(prev => text.slice(0, i + 1));
-        i++;
+    if (currentLineIndex < lines.length) {
+      const targetLine = lines[currentLineIndex];
+      if (currentCharIndex < targetLine.length) {
+        const timer = setTimeout(() => {
+          setCurrentCharIndex(prev => prev + 1);
+        }, charSpeed);
+        return () => clearTimeout(timer);
       } else {
-        clearInterval(interval);
+        const timer = setTimeout(() => {
+          setCurrentLineIndex(prev => prev + 1);
+          setCurrentCharIndex(0);
+        }, lineDelay);
+        return () => clearTimeout(timer);
       }
-    }, speed);
+    }
+  }, [lines, currentLineIndex, currentCharIndex, charSpeed, lineDelay]);
 
-    return () => clearInterval(interval);
-  }, [text, speed]);
+  const renderedText = lines
+    .slice(0, currentLineIndex + 1)
+    .map((line, idx) => {
+      if (idx < currentLineIndex) return line;
+      return line.slice(0, currentCharIndex);
+    })
+    .join('\n');
 
-  return <span>{displayedText}</span>;
+  return <span>{renderedText}</span>;
 }
 
 export default function LiveThinkingCard({ steps = [], isFinished = false }) {
@@ -37,16 +42,16 @@ export default function LiveThinkingCard({ steps = [], isFinished = false }) {
   if (isFinished || !steps || steps.length === 0) return null;
 
   return (
-    <div className="live-thinking-container my-3 p-3 rounded-lg border border-slate-800/80 bg-slate-950/40 font-mono text-[11px] sm:text-xs text-slate-400 space-y-2.5 transition-all">
+    <div className="live-thinking-container my-2 p-2 rounded-md bg-transparent text-slate-400/80 font-mono text-[9px] sm:text-[10px] font-thin leading-normal tracking-tight space-y-2 opacity-85 transition-all">
       {steps.map((step, idx) => (
-        <div key={idx} className="thinking-step-item leading-relaxed">
-          <div className="flex items-center justify-between text-slate-400 font-normal">
+        <div key={idx} className="thinking-step-item">
+          <div className="flex items-center justify-between text-slate-400/90 font-extralight text-[9px] uppercase tracking-wider">
             <span>{step.title}</span>
-            {step.timestamp && <span className="text-[9px] text-slate-600 font-normal">{step.timestamp}</span>}
+            {step.timestamp && <span className="text-[8px] text-slate-600 font-extralight">{step.timestamp}</span>}
           </div>
           {step.detail && (
-            <div className="thinking-step-detail mt-1 pl-2 border-l border-slate-800 text-slate-500 font-normal text-[11px] leading-normal whitespace-pre-wrap">
-              <SmoothTypewriterText text={step.detail} speed={12} />
+            <div className="thinking-step-detail mt-0.5 pl-2 border-l border-slate-800/60 text-slate-500/90 font-thin text-[9px] sm:text-[10px] leading-relaxed whitespace-pre-wrap">
+              <LineByLineTypewriterText text={step.detail} charSpeed={6} lineDelay={40} />
             </div>
           )}
         </div>

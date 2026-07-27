@@ -465,13 +465,12 @@ body {
 
 .ai-message {
   align-self: flex-start;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  border-bottom-left-radius: 4px;
+  background: transparent;
+  border: none;
+  padding: 0.4rem 0;
   width: 100%;
-  max-width: 88%;
-  box-shadow: 0 2px 8px var(--card-shadow);
+  max-width: 100%;
+  color: var(--text-main);
 }
 
 .message-sender-header {

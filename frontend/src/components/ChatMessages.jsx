@@ -49,6 +49,39 @@ function ExpandableUserText({ text, msgId, onCopy, isCopied }) {
   );
 }
 
+// Streaming Markdown component for smooth word-by-word/line-by-line ChatGPT response animation
+function StreamingMarkdown({ text, isLatest }) {
+  const [displayedText, setDisplayedText] = useState(isLatest ? '' : text);
+
+  useEffect(() => {
+    if (!isLatest) {
+      setDisplayedText(text);
+      return;
+    }
+
+    if (!text) {
+      setDisplayedText('');
+      return;
+    }
+
+    let idx = 0;
+    const interval = setInterval(() => {
+      if (idx < text.length) {
+        const step = Math.min(text.length, idx + 5);
+        setDisplayedText(text.slice(0, step));
+        idx += 5;
+      } else {
+        setDisplayedText(text);
+        clearInterval(interval);
+      }
+    }, 12);
+
+    return () => clearInterval(interval);
+  }, [text, isLatest]);
+
+  return <ReactMarkdown>{displayedText}</ReactMarkdown>;
+}
+
 export default function ChatMessages({
   messages = [],
   loading,
@@ -171,56 +204,60 @@ export default function ChatMessages({
       onScroll={handleScroll}
     >
       <div className="messages-container">
-        {messages.map(msg => (
-          <div
-            key={msg.id}
-            className={`message-bubble ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}
-          >
-            {msg.sender === 'ai' && (
-              <div className="message-sender-header">
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Bot size={18} color="#38bdf8" />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Sabha<span style={{ color: '#818cf8' }}>.ai</span></span>
-                </span>
+        {messages.map((msg, index) => {
+          const isLatestAi = msg.sender === 'ai' && index === messages.length - 1;
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {msg.personas && msg.personas.length > 0 && (
+          return (
+            <div
+              key={msg.id}
+              className={`message-bubble ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}
+            >
+              {msg.sender === 'ai' && (
+                <div className="message-sender-header">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Bot size={18} color="#38bdf8" />
+                    <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Sabha<span style={{ color: '#818cf8' }}>.ai</span></span>
+                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {msg.personas && msg.personas.length > 0 && (
+                      <button
+                        className="view-personas-badge-btn"
+                        onClick={() => onInspectModal({ personas: msg.personas, transcript: msg.transcript, verification: msg.verification })}
+                      >
+                        <Users size={14} color="#38bdf8" />
+                        <span>Inspect {msg.personas.length} Personas & Audit</span>
+                        <Eye size={12} style={{ marginLeft: '2px' }} />
+                      </button>
+                    )}
+
                     <button
-                      className="view-personas-badge-btn"
-                      onClick={() => onInspectModal({ personas: msg.personas, transcript: msg.transcript, verification: msg.verification })}
+                      className="copy-btn"
+                      onClick={() => handleCopy(msg.id, msg.text)}
+                      title="Copy to clipboard"
                     >
-                      <Users size={14} color="#38bdf8" />
-                      <span>Inspect {msg.personas.length} Personas & Audit</span>
-                      <Eye size={12} style={{ marginLeft: '2px' }} />
+                      {copiedId === msg.id ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
                     </button>
-                  )}
-
-                  <button
-                    className="copy-btn"
-                    onClick={() => handleCopy(msg.id, msg.text)}
-                    title="Copy to clipboard"
-                  >
-                    {copiedId === msg.id ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
-                  </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Render User Prompts vs AI Rich Markdown Responses */}
-            {msg.sender === 'user' ? (
-              <ExpandableUserText
-                text={msg.text}
-                msgId={msg.id}
-                onCopy={handleCopy}
-                isCopied={copiedId === msg.id}
-              />
-            ) : (
-              <div className="message-content markdown-body">
-                <ReactMarkdown>{msg.text}</ReactMarkdown>
-              </div>
-            )}
-          </div>
-        ))}
+              {/* Render User Prompts vs AI Rich Markdown Responses with Line-by-Line Streaming */}
+              {msg.sender === 'user' ? (
+                <ExpandableUserText
+                  text={msg.text}
+                  msgId={msg.id}
+                  onCopy={handleCopy}
+                  isCopied={copiedId === msg.id}
+                />
+              ) : (
+                <div className="message-content markdown-body">
+                  <StreamingMarkdown text={msg.text} isLatest={isLatestAi} />
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {/* Real-Time Live Thinking Process Card Stream */}
         {liveSteps && liveSteps.length > 0 && (
@@ -247,16 +284,17 @@ export default function ChatMessages({
           </div>
         )}
 
-        {/* Floating Scroll to Bottom Button when user scrolls up */}
+        {/* Sleek Icon-Only Scroll to Bottom Sign Button on Right Side */}
         {userHasScrolledUp && (
           <button
             className="scroll-bottom-btn"
+            title="Scroll to latest output"
             onClick={() => {
               setUserHasScrolledUp(false);
               messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }}
           >
-            <ChevronDown size={14} /> Jump to latest step
+            <ChevronDown size={15} color="#38bdf8" />
           </button>
         )}
 
