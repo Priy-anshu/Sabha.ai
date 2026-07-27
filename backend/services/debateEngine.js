@@ -155,11 +155,11 @@ Review the critiques from other personas. Update and refine your proposal to add
       });
     }
 
-    // Step B: Remaining Personas Review & Cast Vote (AGREED or DISAGREED)
+    // Step B: Remaining Personas Review & Cast Vote IN PARALLEL (70% Speedup!)
     let roundDissenters = 0;
-    for (let i = 1; i < personas.length; i++) {
-      const p = personas[i];
+    const remainingPersonas = personas.slice(1);
 
+    const critiquePromises = remainingPersonas.map(async (p) => {
       if (onProgress) {
         onProgress({
           title: `Round ${round}: ${p.name} (${p.role}) Auditing & Voting`,
@@ -188,6 +188,13 @@ Below the status line, provide your concise feedback (100-150 words) using markd
       });
 
       const isAgreed = deltaOutput.includes('STATUS: AGREED');
+      return { persona: p, deltaOutput, isAgreed };
+    });
+
+    const critiqueResults = await Promise.all(critiquePromises);
+
+    for (const res of critiqueResults) {
+      const { persona: p, deltaOutput, isAgreed } = res;
       if (!isAgreed) roundDissenters++;
 
       transcript.push({

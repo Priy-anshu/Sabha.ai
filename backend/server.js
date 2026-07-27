@@ -58,6 +58,14 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
+  const keepAliveInterval = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch (e) {
+      clearInterval(keepAliveInterval);
+    }
+  }, 10000);
+
   const sendEvent = (eventType, data) => {
     try {
       res.write(`data: ${JSON.stringify({ type: eventType, ...data })}\n\n`);
@@ -65,6 +73,10 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
       console.warn('SSE Write Warning:', e.message);
     }
   };
+
+  req.on('close', () => {
+    clearInterval(keepAliveInterval);
+  });
 
   try {
     const prompt = (req.body.prompt || '').trim();
@@ -180,6 +192,8 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
     console.error('Debate Stream Error:', error.message);
     sendEvent('error', { error: error.message });
     res.end();
+  } finally {
+    clearInterval(keepAliveInterval);
   }
 });
 
