@@ -1,8 +1,9 @@
 import { ChatDetails } from '../models/ChatDetails.js';
+import { ChatSummary } from '../models/ChatSummary.js';
 import { callLLM } from './llmProvider.js';
 
 /**
- * In-Memory LRU/TTL Session Context Cache
+ * In-Memory LRU/TTL Session Context Cache with Dedicated ChatSummary DB Model
  * Stores distilled context summaries and recent turns per sessionId.
  */
 const sessionMap = new Map();
@@ -19,27 +20,19 @@ export async function getSessionContext(sessionId) {
     return cached;
   }
 
-  // 2. Cache MISS: Load from MongoDB ChatDetails
+  // 2. Cache MISS: Check dedicated ChatSummary model first
   try {
+    const summaryDoc = await ChatSummary.findOne({ sessionId });
     const details = await ChatDetails.find({ sessionId }).sort({ timestamp: 1 });
-    if (!details || details.length === 0) {
-      const emptyData = { summary: '', recentTurns: [], lastAccessed: Date.now() };
-      sessionMap.set(sessionId, emptyData);
-      return emptyData;
-    }
 
-    // Extract recent turns (up to last 6 messages)
-    const recentTurns = details.slice(-6).map(d => ({
+    const recentTurns = (details || []).slice(-6).map(d => ({
       sender: d.sender,
       text: d.text
     }));
 
-    // Build initial summary string from prior messages
-    let summaryText = '';
-    if (details.length > 2) {
-      summaryText = details.map(d => `${d.sender === 'user' ? 'User' : 'Assistant'}: ${d.text}`).slice(0, -2).join('\n');
-    } else {
-      summaryText = recentTurns.map(t => `${t.sender === 'user' ? 'User' : 'Assistant'}: ${t.text}`).join('\n');
+    let summaryText = summaryDoc?.summary || '';
+    if (!summaryText && details && details.length > 0) {
+      summaryText = details.map(d => `${d.sender === 'user' ? 'User' : 'Assistant'}: ${d.text}`).slice(0, -2).join('\n') || recentTurns.map(t => `${t.sender === 'user' ? 'User' : 'Assistant'}: ${t.text}`).join('\n');
     }
 
     const sessionData = {
@@ -55,7 +48,7 @@ export async function getSessionContext(sessionId) {
     }
 
     sessionMap.set(sessionId, sessionData);
-    console.log(`💾 [Session Cache LOAD]: Loaded ${details.length} turns from MongoDB into Cache for ${sessionId}`);
+    console.log(`💾 [Session Cache LOAD]: Loaded ChatSummary from MongoDB for ${sessionId}`);
     return sessionData;
   } catch (err) {
     console.warn(`[Session Cache Error]: ${err.message}`);
@@ -64,8 +57,7 @@ export async function getSessionContext(sessionId) {
 }
 
 /**
- * Updates the in-memory cache with the latest user question and assistant answer turn,
- * and asynchronously condenses the summary.
+ * Updates the in-memory cache and persists the summary into dedicated ChatSummary model
  */
 export async function updateSessionContext(sessionId, userPrompt, assistantAnswer) {
   if (!sessionId) return;
@@ -96,8 +88,15 @@ export async function updateSessionContext(sessionId, userPrompt, assistantAnswe
     } else {
       updatedSummary = updatedTurns.map(t => `${t.sender === 'user' ? 'User' : 'Assistant'}: ${t.text}`).join('\n');
     }
+
+    // Persist to dedicated ChatSummary MongoDB Collection
+    await ChatSummary.findOneAndUpdate(
+      { sessionId },
+      { sessionId, summary: updatedSummary, lastUpdated: new Date() },
+      { upsert: true, new: true }
+    );
   } catch (err) {
-    console.warn(`[Summary Distillation Warning]: ${err.message}`);
+    console.warn(`[Summary Distillation/Persist Warning]: ${err.message}`);
   }
 
   sessionMap.set(sessionId, {
@@ -106,7 +105,7 @@ export async function updateSessionContext(sessionId, userPrompt, assistantAnswe
     lastAccessed: Date.now()
   });
 
-  console.log(`⚡ [Session Cache UPDATED]: Cached latest turn & summary for ${sessionId}`);
+  console.log(`⚡ [Session Cache & ChatSummary DB UPDATED]: Cached & saved summary for ${sessionId}`);
 }
 
 /**

@@ -2,6 +2,8 @@ import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { cosineSimilarity } from './services/ragService.js';
 import { generateChatTitle } from './services/personaAllocator.js';
+import { getSessionContext, updateSessionContext, formatContextPrompt } from './services/sessionCache.js';
+import { connectDB } from './config/db.js';
 
 dotenv.config();
 
@@ -37,8 +39,6 @@ async function testTitleGenerator() {
   console.log(`Prompt 2: "${prompt2}" ➔ Title: "${title2}"`);
 }
 
-import { getSessionContext, updateSessionContext, formatContextPrompt } from './services/sessionCache.js';
-
 async function testSessionMemoryCache() {
   console.log('\n🧠 Testing In-Memory Session Context Cache...');
   const testSessionId = 'sess_test_memory_' + Date.now();
@@ -62,6 +62,7 @@ async function testSessionMemoryCache() {
 
 async function runTest() {
   console.log('🧪 Testing Google Vector Generation & Cosine Similarity...');
+  await connectDB();
   const workingModel = await testEmbeddingModels();
   await testSessionMemoryCache();
 
