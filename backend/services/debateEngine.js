@@ -64,59 +64,132 @@ Use any attached document context if provided to answer the user warmly and accu
   }
 
   const transcript = [];
+  const MAX_ROUNDS = 3;
+  let consensusReached = false;
+  let currentProposal = '';
+  let finalRoundReached = 1;
 
-  // Step 2: Persona 1 proposes initial solution
   const persona1 = personas[0];
-  const p1Instruction = `You are ${persona1.name} (${persona1.role}).
+
+  // 🔄 3-ROUND CONSENSUS LOOP
+  for (let round = 1; round <= MAX_ROUNDS; round++) {
+    finalRoundReached = round;
+    console.log(`🗣️ Starting Debate Round ${round}/${MAX_ROUNDS}...`);
+
+    // Step A: Persona 1 Proposes / Refines Solution
+    if (round === 1) {
+      const p1Instruction = `You are ${persona1.name} (${persona1.role}).
 Mindset: ${persona1.mindset}.${behaviorDirectives}
-Analyze the user request and the attached document context (if provided) and propose your initial technical/analytical solution. Use markdown hyphens (- ) for sub-item bullet lists under subheadings.`;
+Analyze the user request and attached document context (if provided). Propose your initial technical/analytical solution. Use markdown hyphens (- ) for sub-item bullet lists under subheadings.`;
 
-  const persona1Output = await callLLM({
-    prompt: contextAugmentedPrompt,
-    systemInstruction: p1Instruction,
-    provider,
-    temperature: 0.4
-  });
+      currentProposal = await callLLM({
+        prompt: contextAugmentedPrompt,
+        systemInstruction: p1Instruction,
+        provider,
+        temperature: 0.4
+      });
 
-  transcript.push({
-    personaName: persona1.name,
-    role: persona1.role,
-    output: persona1Output
-  });
+      transcript.push({
+        round,
+        personaName: persona1.name,
+        role: persona1.role,
+        output: currentProposal,
+        vote: 'PROPOSED'
+      });
+    } else {
+      // In Round 2 & 3: Persona 1 updates the proposal addressing prior critiques
+      const p1RefineInstruction = `You are ${persona1.name} (${persona1.role}).
+Mindset: ${persona1.mindset}.${behaviorDirectives}
+Review the critiques from other personas. Update and refine your proposal to address their concerns, resolve flaws, and achieve consensus. Use markdown hyphens (- ) for bullet lists.`;
 
-  // Step 3: Delta-Only Critique Loop across remaining personas (saves tokens & prevents bloat)
-  for (let i = 1; i < personas.length; i++) {
-    const p = personas[i];
-    const critiqueInstruction = `You are ${p.name} (${p.role}).
+      const priorCritiques = transcript.filter(t => t.round === round - 1 && t.personaName !== persona1.name).map(t => `${t.personaName}: ${t.output}`).join('\n\n');
+      currentProposal = await callLLM({
+        prompt: `${contextAugmentedPrompt}\n\n[Prior Proposal]:\n${currentProposal}\n\n[Critiques to Address]:\n${priorCritiques}\n\nProvide your Refined Proposal addressing all feedback:`,
+        systemInstruction: p1RefineInstruction,
+        provider,
+        temperature: 0.4
+      });
+
+      transcript.push({
+        round,
+        personaName: persona1.name,
+        role: persona1.role,
+        output: `[Refined Proposal - Round ${round}]:\n${currentProposal}`,
+        vote: 'REFINED'
+      });
+    }
+
+    // Step B: Remaining Personas Review & Cast Vote (AGREED or DISAGREED)
+    let roundDissenters = 0;
+    for (let i = 1; i < personas.length; i++) {
+      const p = personas[i];
+      const critiqueInstruction = `You are ${p.name} (${p.role}).
 Mindset: ${p.mindset}.${behaviorDirectives}
 
-DELTA-ONLY CRITIQUE INSTRUCTIONS:
-Do NOT re-write or repeat the entire previous solution. Output ONLY a concise, focused Delta Critique (100-150 words):
-1. **Flaws & Vulnerabilities**: Identify 1-3 specific weaknesses, edge cases, or security issues in the proposed solution.
-2. **Actionable Refinements**: Provide exact, technical fixes and improvements to resolve those weaknesses.
+CONSENSUS REVIEW & CRITIQUE INSTRUCTIONS:
+Evaluate the latest proposal by ${persona1.name}.
+At the VERY FIRST LINE of your response, write your explicit status:
+- Write "STATUS: AGREED" if the proposal satisfactorily addresses all major technical, security, and performance concerns.
+- Write "STATUS: DISAGREED" if critical flaws, missing edge cases, or unhandled risks remain.
 
-Use markdown hyphens (- ) for bullet lists.`;
+Below the status line, provide your concise feedback (100-150 words) using markdown hyphens (- ) for bullet lists.`;
 
-    const previousCritiquesText = transcript.slice(1).map(t => `${t.personaName}: ${t.output}`).join('\n\n');
-    const promptForCritique = `${contextAugmentedPrompt}\n\n[Initial Proposal by ${persona1.name}]:\n${persona1Output}${previousCritiquesText ? `\n\n[Prior Persona Critiques]:\n${previousCritiquesText}` : ''}\n\nProvide your Delta Critique and Refinements:`;
+      const deltaOutput = await callLLM({
+        prompt: `${contextAugmentedPrompt}\n\n[Current Refined Proposal by ${persona1.name}]:\n${currentProposal}\n\nReview and provide your STATUS (AGREED or DISAGREED) and concise feedback:`,
+        systemInstruction: critiqueInstruction,
+        provider,
+        temperature: 0.4
+      });
 
-    const deltaOutput = await callLLM({
-      prompt: promptForCritique,
-      systemInstruction: critiqueInstruction,
-      provider,
-      temperature: 0.4
-    });
+      const isAgreed = deltaOutput.includes('STATUS: AGREED');
+      if (!isAgreed) roundDissenters++;
 
-    transcript.push({
-      personaName: p.name,
-      role: p.role,
-      output: deltaOutput
-    });
+      transcript.push({
+        round,
+        personaName: p.name,
+        role: p.role,
+        output: deltaOutput,
+        vote: isAgreed ? 'AGREED' : 'DISAGREED'
+      });
+    }
+
+    // Check if Unanimous Agreement was reached in this round
+    if (roundDissenters === 0) {
+      console.log(`🎉 Unanimous Consensus reached by all personas in Round ${round}!`);
+      consensusReached = true;
+      break;
+    }
+  }
+
+  // ⚖️ FALLBACK VOTING & TIE-BREAKER LOOP (If still not unanimous after 3 Rounds)
+  let votingSummary = '';
+  if (!consensusReached) {
+    console.log('⚖️ Unanimous agreement not reached after 3 rounds. Triggering Fallback Majority Voting Loop...');
+
+    const votes = [];
+    for (const p of personas) {
+      const voteInstruction = `You are ${p.name} (${p.role}).
+Mindset: ${p.mindset}.${behaviorDirectives}
+The council has completed 3 rounds of debate. Cast your final vote on the core solution.
+State: "FINAL VOTE: APPROVE" or "FINAL VOTE: APPROVE WITH CONDITIONS" or "FINAL VOTE: DISSENT".
+List 1 key reason for your vote.`;
+
+      const voteOutput = await callLLM({
+        prompt: `${contextAugmentedPrompt}\n\n[Final Proposal]:\n${currentProposal}\n\nCast your final vote and 1-sentence rationale:`,
+        systemInstruction: voteInstruction,
+        provider,
+        temperature: 0.3
+      });
+
+      votes.push(`${p.name} (${p.role}): ${voteOutput}`);
+    }
+    votingSummary = `\n\nFALLBACK MAJORITY VOTING SUMMARY:\n${votes.join('\n')}`;
   }
 
   // Step 4: Final Master Synthesizer Agent
   const synthesizerInstruction = `You are the Lead Synthesis Master Agent.
-Synthesize the Initial Proposal along with all Delta Critiques into a single, unified, well-structured final answer.${behaviorDirectives}
+${consensusReached ? 'Unanimous consensus was achieved by all council personas.' : 'A 3-round debate concluded with a majority vote decision.'}
+Synthesize the final proposal, persona critiques, and voting results into a single, unified, well-structured answer.${behaviorDirectives}
 
 STRICT MARKDOWN BULLET FORMATTING RULES:
 1. Every sub-item, test case, sub-heading point, or key principle MUST start with a markdown hyphen and space ("- ").
@@ -130,7 +203,7 @@ STRICT MARKDOWN BULLET FORMATTING RULES:
 3. Do NOT mention verifier names in the final output.`;
 
   const finalConsensus = await callLLM({
-    prompt: `${contextAugmentedPrompt}\n\n[Initial Proposal by ${persona1.name}]:\n${persona1Output}\n\n[Persona Delta Critiques]:\n${transcript.slice(1).map(t => `${t.personaName}: ${t.output}`).join('\n\n')}\n\nSynthesize the final answer:`,
+    prompt: `${contextAugmentedPrompt}\n\n[Final Proposal]:\n${currentProposal}\n\n[Debate Transcript Across ${finalRoundReached} Rounds]:\n${transcript.map(t => `Round ${t.round} - ${t.personaName} (${t.vote}): ${t.output}`).join('\n\n')}${votingSummary}\n\nSynthesize the final answer:`,
     systemInstruction: synthesizerInstruction,
     provider,
     temperature: 0.3
