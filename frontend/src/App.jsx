@@ -208,7 +208,8 @@ export default function App() {
               text: event.response,
               personas: event.personas,
               transcript: event.transcript,
-              verification: event.verification
+              verification: event.verification,
+              isNew: true
             };
             const finalMessages = [...updatedMessages, aiMsg];
             setMessages(finalMessages);

@@ -47,10 +47,10 @@ export async function runDebate({ userPrompt, personas, provider = 'gemini', doc
 
   // Handle single-persona casual chat bypass
   if (personas.length === 1) {
-    const singlePersona = personas[0];
+    const pName = singlePersona.name.includes('(') ? singlePersona.name : `${singlePersona.name} (${singlePersona.role})`;
     if (onProgress) {
       onProgress({
-        title: `${singlePersona.name} (${singlePersona.role}) Responding...`,
+        title: `${pName} Responding`,
         detail: 'Direct assistant response mode',
         status: 'in_progress',
         activePersona: singlePersona.name

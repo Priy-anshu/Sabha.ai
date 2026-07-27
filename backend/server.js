@@ -83,7 +83,7 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
     let attachedFileName = '';
 
     sendEvent('status', {
-      title: '🔍 Analyzing Intent & Context Memory',
+      title: 'Analyzing Intent & Context Memory',
       detail: 'Scanning document context and memory cache...',
       status: 'in_progress'
     });
@@ -112,7 +112,7 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
     const chatMemoryPrompt = formatContextPrompt(sessionContextData);
 
     sendEvent('status', {
-      title: '🧠 Allocating Specialized Council Personas',
+      title: 'Allocating Specialized Council Personas',
       detail: 'Performing deep domain analysis to select expert triad...',
       status: 'in_progress'
     });
@@ -122,8 +122,8 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
 
     sendEvent('personas_allocated', {
       personas,
-      title: `Allocated ${personas.length} Expert Personas`,
-      detail: personas.map(p => p.name).join(' • '),
+      title: `Allocated ${personas.length} Expert Persona${personas.length > 1 ? 's' : ''}`,
+      detail: personas.map(p => `${p.name} (${p.role})`).join(' • '),
       status: 'completed'
     });
 
@@ -140,7 +140,7 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
     });
 
     sendEvent('status', {
-      title: '🛡️ Running Dual-Persona Quality Audit',
+      title: 'Running Dual-Persona Quality Audit',
       detail: 'Fact Auditor (Kavya) & Completeness Auditor (Ishaan) auditing consensus output...',
       status: 'in_progress'
     });
@@ -155,7 +155,7 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
     }
 
     sendEvent('status', {
-      title: '✨ Dual Verifiers Approved Final Consensus',
+      title: 'Dual Verifiers Approved Final Consensus',
       detail: 'Quality audit passed successfully.',
       status: 'completed'
     });

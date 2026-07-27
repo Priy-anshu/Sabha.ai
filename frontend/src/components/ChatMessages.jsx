@@ -250,9 +250,13 @@ export default function ChatMessages({
                   onCopy={handleCopy}
                   isCopied={copiedId === msg.id}
                 />
+              ) : isLatestAi && msg.isNew ? (
+                <div className="message-content markdown-body">
+                  <StreamingMarkdown text={msg.text} isLatest={true} />
+                </div>
               ) : (
                 <div className="message-content markdown-body">
-                  <StreamingMarkdown text={msg.text} isLatest={isLatestAi} />
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
                 </div>
               )}
             </div>
