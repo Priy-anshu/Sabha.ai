@@ -150,7 +150,7 @@ Review the critiques from other personas. Update and refine your proposal to add
     if (onProgress) {
       onProgress({
         title: `Round ${round}: ${persona1.name} ${round === 1 ? 'Submitted Proposal' : 'Updated Refined Proposal'}`,
-        detail: currentProposal.slice(0, 180) + '...',
+        detail: currentProposal,
         status: 'completed'
       });
     }
@@ -201,7 +201,7 @@ Below the status line, provide your concise feedback (100-150 words) using markd
       if (onProgress) {
         onProgress({
           title: `Round ${round}: ${p.name} Voted [${isAgreed ? 'STATUS: AGREED' : 'STATUS: DISAGREED'}]`,
-          detail: deltaOutput.slice(0, 180) + '...',
+          detail: deltaOutput,
           status: 'completed'
         });
       }

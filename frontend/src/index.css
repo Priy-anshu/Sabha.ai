@@ -1097,31 +1097,32 @@ body {
   line-height: 1.25;
 }
 
-/* Floating Scroll To Bottom Button */
+/* Floating Scroll To Bottom Button (Bottom-Right Corner, Small & Sleek) */
 .scroll-bottom-btn {
-  position: sticky;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  left: auto;
+  transform: none;
+  z-index: 50;
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(15, 23, 42, 0.9);
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.85);
   color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  backdrop-filter: blur(8px);
-  padding: 6px 14px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  backdrop-filter: blur(10px);
+  padding: 5px 11px;
   border-radius: 20px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   transition: all 0.2s ease;
 }
 
 .scroll-bottom-btn:hover {
   background: rgba(30, 41, 59, 0.95);
   border-color: #38bdf8;
-  transform: translateX(-50%) translateY(-2px);
+  transform: translateY(-2px);
 }
