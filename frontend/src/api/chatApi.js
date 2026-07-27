@@ -1,6 +1,6 @@
 import { fetchWithAuth } from './apiConfig.js';
 
-export async function sendDebatePrompt({ prompt, file, existingPersonas, sessionId, signal }) {
+export async function sendDebatePrompt({ prompt, file, existingPersonas, behaviors, sessionId, signal }) {
   const formData = new FormData();
   formData.append('prompt', prompt || '');
 
@@ -14,6 +14,10 @@ export async function sendDebatePrompt({ prompt, file, existingPersonas, session
 
   if (existingPersonas && existingPersonas.length > 0) {
     formData.append('existingPersonas', JSON.stringify(existingPersonas));
+  }
+
+  if (behaviors && behaviors.length > 0) {
+    formData.append('behaviors', JSON.stringify(behaviors));
   }
 
   const res = await fetchWithAuth('/api/chat/debate', {

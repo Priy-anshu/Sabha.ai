@@ -1,12 +1,42 @@
 import { callLLM } from './llmProvider.js';
 
+const BEHAVIOR_PROMPT_MAP = {
+  no_sugarcoating: "Be blunt, direct, and unfiltered. Avoid polite fluff, filler text, pleasantries, or ego validation.",
+  strict: "Enforce strict, rigorous standards. Call out logical fallacies, edge cases, and weak assumptions immediately.",
+  analytical: "Be clinical, data-driven, and objective. Rely on evidence, logical metrics, and clear structured breakdowns.",
+  first_principles: "Deconstruct problems down to fundamental truths and build up solutions from first principles.",
+  devils_advocate: "Actively play Devil's Advocate. Challenge assumptions, seek out hidden vulnerabilities, and focus on worst-case scenarios.",
+  skeptical: "Be skeptical. Question every unproven assumption and demand concrete proof or justification.",
+  edge_case_obsessed: "Be obsessed with edge cases. Focus heavily on failure modes, race conditions, and boundary limits.",
+  security_focused: "Prioritize security, data privacy, encryption, and zero-trust principles above all else.",
+  pragmatic: "Be pragmatic and minimalist. Focus on realistic, simple execution without over-engineering or unnecessary complexity.",
+  code_purist: "Be a strict code purist. Adhere strictly to clean code principles, DRY, SOLID, and proven design patterns.",
+  concise: "Be ultra-concise. Use short, punchy bullet points and cut out unnecessary wordiness.",
+  system_architect: "Think like a Principal System Architect. Focus on high-level system boundaries, trade-offs, and scalability.",
+  friendly: "Be warm, friendly, polite, and encouraging.",
+  mentor: "Act as a patient mentor/teacher. Explain concepts clearly step-by-step using intuitive analogies.",
+  socratic: "Use the Socratic method. Guide the user by posing thoughtful counter-questions that stimulate deeper insight.",
+  creative: "Be visionary and highly creative. Brainstorm innovative, out-of-the-box ideas and novel approaches.",
+  serious: "Maintain a formal, serious, executive corporate tone suitable for C-level presentation.",
+  sarcastic: "Use subtle dry humor, wit, and sarcasm while still providing technically precise and accurate information."
+};
+
+function buildBehaviorPrompt(behaviors = []) {
+  if (!behaviors || !Array.isArray(behaviors) || behaviors.length === 0) return '';
+  const directives = behaviors.map(b => BEHAVIOR_PROMPT_MAP[b]).filter(Boolean);
+  if (directives.length === 0) return '';
+  return `\n\nUSER-SPECIFIED BEHAVIOR & TONAL DIRECTIVES:\n` + directives.map(d => `- ${d}`).join('\n');
+}
+
 /**
- * Step B: Sequential Adversarial Debate Loop with RAG Document Context Support
+ * Step B: Sequential Adversarial Debate Loop with RAG Document Context Support & Behavior Directives
  */
-export async function runDebate({ userPrompt, personas, provider = 'gemini', documentContext = '' }) {
+export async function runDebate({ userPrompt, personas, provider = 'gemini', documentContext = '', behaviors = [] }) {
   if (!personas || personas.length === 0) {
     throw new Error('No personas provided for debate');
   }
+
+  const behaviorDirectives = buildBehaviorPrompt(behaviors);
 
   // Build Document Augmented Prompt
   const contextAugmentedPrompt = documentContext
@@ -17,7 +47,7 @@ export async function runDebate({ userPrompt, personas, provider = 'gemini', doc
   if (personas.length === 1) {
     const singlePersona = personas[0];
     const systemPrompt = `You are ${singlePersona.name}, acting in the role of ${singlePersona.role}.
-Mindset: ${singlePersona.mindset}.
+Mindset: ${singlePersona.mindset}.${behaviorDirectives}
 Use any attached document context if provided to answer the user warmly and accurately. Use markdown bullet points (- ) for sub-items.`;
 
     const singleResponse = await callLLM({
@@ -39,7 +69,7 @@ Use any attached document context if provided to answer the user warmly and accu
   // Step 2: Persona 1 proposes initial solution
   const persona1 = personas[0];
   const p1Instruction = `You are ${persona1.name} (${persona1.role}).
-Mindset: ${persona1.mindset}.
+Mindset: ${persona1.mindset}.${behaviorDirectives}
 Analyze the user request and the attached document context (if provided) and propose your initial technical/analytical solution. Use markdown hyphens (- ) for sub-item bullet lists under subheadings.`;
 
   currentProposal = await callLLM({
@@ -59,7 +89,7 @@ Analyze the user request and the attached document context (if provided) and pro
   for (let i = 1; i < personas.length; i++) {
     const p = personas[i];
     const critiqueInstruction = `You are ${p.name} (${p.role}).
-Mindset: ${p.mindset}.
+Mindset: ${p.mindset}.${behaviorDirectives}
 Review the user query, attached document context, and previous solution. Critique the previous solution for flaws, security issues, performance bottlenecks, or unhandled edge cases. Present your refined version using markdown hyphens (- ) for bullet lists.`;
 
     const nextOutput = await callLLM({
@@ -79,7 +109,7 @@ Review the user query, attached document context, and previous solution. Critiqu
 
   // Step 4: Final Master Synthesizer Agent
   const synthesizerInstruction = `You are the Lead Synthesis Master Agent.
-Synthesize all persona proposals, critiques, and attached document context into a unified, flawless, well-structured final answer.
+Synthesize all persona proposals, critiques, and attached document context into a unified, well-structured final answer.${behaviorDirectives}
 
 STRICT MARKDOWN BULLET FORMATTING RULES:
 1. Every sub-item, test case, sub-heading point, or key principle MUST start with a markdown hyphen and space ("- ").

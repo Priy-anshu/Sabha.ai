@@ -57,6 +57,7 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
     const prompt = req.body.prompt;
     const provider = req.body.provider || 'gemini';
     const existingPersonas = req.body.existingPersonas ? JSON.parse(req.body.existingPersonas) : [];
+    const behaviors = req.body.behaviors ? JSON.parse(req.body.behaviors) : [];
     const sessionId = req.body.sessionId || 'sess_default';
     const isGuestUser = !req.user || req.user.userId === 'guest_user_101';
 
@@ -108,15 +109,16 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
     const finalPrompt = prompt || `Summarize and analyze attached document: ${attachedFileName}`;
 
     // Step A: Allocate personas
-    const allocation = await allocatePersonas({ prompt: finalPrompt, existingPersonas });
+    const allocation = await allocatePersonas({ prompt: finalPrompt, existingPersonas, behaviors });
     const personas = allocation.personas;
 
-    // Step B: Run Sequential Adversarial Debate with RAG context
+    // Step B: Run Sequential Adversarial Debate with RAG context & User Behavior Directives
     const debateResult = await runDebate({
       userPrompt: finalPrompt,
       personas,
       provider,
-      documentContext
+      documentContext,
+      behaviors
     });
 
     // Step C: Run Dual-Persona Verification Layer

@@ -51,11 +51,13 @@ export async function allocatePersonas(inputParam, existingPersonasParam = [], p
   let userPrompt = '';
   let existingPersonas = [];
   let provider = 'gemini';
+  let behaviors = [];
 
   if (typeof inputParam === 'object' && inputParam !== null) {
     userPrompt = inputParam.prompt || inputParam.userPrompt || '';
     existingPersonas = inputParam.existingPersonas || [];
     provider = inputParam.provider || 'gemini';
+    behaviors = inputParam.behaviors || [];
   } else {
     userPrompt = String(inputParam || '');
     existingPersonas = existingPersonasParam || [];

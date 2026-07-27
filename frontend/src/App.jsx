@@ -21,6 +21,21 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
 
+  // Agent Behaviors State
+  const [selectedBehaviors, setSelectedBehaviors] = useState(() => {
+    try {
+      const saved = localStorage.getItem('selectedBehaviors');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleUpdateBehaviors = (newBehaviors) => {
+    setSelectedBehaviors(newBehaviors);
+    localStorage.setItem('selectedBehaviors', JSON.stringify(newBehaviors));
+  };
+
   // Collapsible Sidebar State (defaults to true for logged-in users)
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -66,6 +81,7 @@ export default function App() {
       setActivePersonas([]);
       setAttachedFile(null);
       setInput('');
+      setSelectedBehaviors([]);
       setModalData(null);
       setLoading(false);
       setSessionId('sess_' + Date.now());
@@ -152,6 +168,7 @@ export default function App() {
         prompt: currentInput,
         file: currentFile,
         existingPersonas: activePersonas,
+        behaviors: selectedBehaviors,
         sessionId,
         signal: controller.signal
       });
@@ -223,6 +240,8 @@ export default function App() {
           onOpenAuthModal={() => setShowAuthModal(true)}
           theme={theme}
           onToggleTheme={handleToggleTheme}
+          selectedBehaviors={selectedBehaviors}
+          onUpdateBehaviors={handleUpdateBehaviors}
         />
 
         <ChatMessages

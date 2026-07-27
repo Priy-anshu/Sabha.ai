@@ -1,8 +1,17 @@
 import React from 'react';
 import { Bot, LogIn, PanelLeftOpen, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import AgentBehaviorDropdown from './AgentBehaviorDropdown.jsx';
 
-export default function ChatHeader({ sidebarOpen, onToggleSidebar, onOpenAuthModal, theme, onToggleTheme }) {
+export default function ChatHeader({
+  sidebarOpen,
+  onToggleSidebar,
+  onOpenAuthModal,
+  theme,
+  onToggleTheme,
+  selectedBehaviors,
+  onUpdateBehaviors
+}) {
   const { user } = useAuth();
 
   return (
@@ -24,6 +33,14 @@ export default function ChatHeader({ sidebarOpen, onToggleSidebar, onOpenAuthMod
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Agent Behaviors Dropdown Menu (Only for Logged-In Users) */}
+        {user && (
+          <AgentBehaviorDropdown
+            selectedBehaviors={selectedBehaviors}
+            onChangeBehaviors={onUpdateBehaviors}
+          />
+        )}
+
         {/* Small Theme Toggle Button */}
         <button
           className="theme-toggle-icon-btn"
