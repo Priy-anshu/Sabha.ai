@@ -37,10 +37,33 @@ async function testTitleGenerator() {
   console.log(`Prompt 2: "${prompt2}" ➔ Title: "${title2}"`);
 }
 
+import { getSessionContext, updateSessionContext, formatContextPrompt } from './services/sessionCache.js';
+
+async function testSessionMemoryCache() {
+  console.log('\n🧠 Testing In-Memory Session Context Cache...');
+  const testSessionId = 'sess_test_memory_' + Date.now();
+
+  console.log('Turn 1: User tells favorite actress...');
+  await updateSessionContext(testSessionId, 'Alia Bhatt is my favorite actress.', 'Got it! I will remember that Alia Bhatt is your favorite actress.');
+
+  const contextData = await getSessionContext(testSessionId);
+  const formattedPrompt = formatContextPrompt(contextData);
+
+  console.log('--- Formatted Context Prompt Sent to LLMs ---');
+  console.log(formattedPrompt);
+  console.log('---------------------------------------------');
+
+  if (formattedPrompt.includes('Alia Bhatt')) {
+    console.log('🎉 Session Memory Cache Test PASSED Cleanly!');
+  } else {
+    console.warn('⚠️ Session Memory Cache test failed to capture context.');
+  }
+}
+
 async function runTest() {
   console.log('🧪 Testing Google Vector Generation & Cosine Similarity...');
   const workingModel = await testEmbeddingModels();
-  await testTitleGenerator();
+  await testSessionMemoryCache();
 
   if (!workingModel) {
     console.error('❌ No working embedding model found.');

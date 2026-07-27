@@ -7,6 +7,7 @@ import { allocatePersonas } from './services/personaAllocator.js';
 import { runDebate } from './services/debateEngine.js';
 import { runDualVerification } from './services/dualVerifier.js';
 import { extractTextFromFile, chunkText, retrieveRelevantContext, generateEmbeddingsForChunks } from './services/ragService.js';
+import { getSessionContext, updateSessionContext, formatContextPrompt } from './services/sessionCache.js';
 import { connectDB } from './config/db.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -110,17 +111,22 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
 
     const finalPrompt = prompt || `Summarize and analyze attached document: ${attachedFileName}`;
 
+    // Step Memory: Fetch fast in-memory chat summary & recent turns for this session
+    const sessionContextData = await getSessionContext(sessionId);
+    const chatMemoryPrompt = formatContextPrompt(sessionContextData);
+
     // Step A: Allocate personas
     const allocation = await allocatePersonas({ prompt: finalPrompt, existingPersonas, behaviors });
     const personas = allocation.personas;
 
-    // Step B: Run Sequential Adversarial Debate with RAG context & User Behavior Directives
+    // Step B: Run Sequential Adversarial Debate with Memory, RAG context & User Behavior Directives
     const debateResult = await runDebate({
       userPrompt: finalPrompt,
       personas,
       provider,
       documentContext,
-      behaviors
+      behaviors,
+      chatMemoryPrompt
     });
 
     // Step C: Run Dual-Persona Verification Layer
@@ -132,6 +138,11 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
         provider
       });
     }
+
+    // Step Memory Sync: Update In-Memory Cache with latest turn & summary (Non-blocking)
+    updateSessionContext(sessionId, finalPrompt, verificationResult.finalResponse).catch(err => {
+      console.warn('[Cache Sync Warning]:', err.message);
+    });
 
     return res.json({
       success: true,

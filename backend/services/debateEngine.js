@@ -31,17 +31,19 @@ function buildBehaviorPrompt(behaviors = []) {
 /**
  * Step B: Sequential Adversarial Debate Loop with RAG Document Context Support & Behavior Directives
  */
-export async function runDebate({ userPrompt, personas, provider = 'gemini', documentContext = '', behaviors = [] }) {
+export async function runDebate({ userPrompt, personas, provider = 'gemini', documentContext = '', behaviors = [], chatMemoryPrompt = '' }) {
   if (!personas || personas.length === 0) {
     throw new Error('No personas provided for debate');
   }
 
   const behaviorDirectives = buildBehaviorPrompt(behaviors);
 
-  // Build Document Augmented Prompt
-  const contextAugmentedPrompt = documentContext
-    ? `[ATTACHED DOCUMENT CONTEXT (Full Content)]:\n${documentContext}\n\n[USER QUESTION]:\n${userPrompt}`
-    : userPrompt;
+  // Build Context Augmented Prompt with In-Memory Chat History Memory & RAG Context
+  let contextAugmentedPrompt = chatMemoryPrompt || '';
+  if (documentContext) {
+    contextAugmentedPrompt += `[ATTACHED DOCUMENT CONTEXT (Full Content)]:\n${documentContext}\n\n`;
+  }
+  contextAugmentedPrompt += `[USER QUESTION]:\n${userPrompt}`;
 
   // Handle single-persona casual chat bypass
   if (personas.length === 1) {
