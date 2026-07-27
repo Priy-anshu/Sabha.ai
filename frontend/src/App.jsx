@@ -26,19 +26,13 @@ export default function App() {
 
   // Theme State
   const [theme, setTheme] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    if (!savedUser) return 'light';
     return localStorage.getItem('theme') || 'dark';
   });
 
   useEffect(() => {
-    if (!user) {
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.setAttribute('data-theme', theme);
-      localStorage.setItem('theme', theme);
-    }
-  }, [user, theme]);
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   const handleToggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
@@ -63,7 +57,23 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchSessionsList();
+    if (!user) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      setSessions([]);
+      setMessages([]);
+      setActivePersonas([]);
+      setAttachedFile(null);
+      setInput('');
+      setModalData(null);
+      setLoading(false);
+      setSessionId('sess_' + Date.now());
+      setSidebarOpen(false);
+    } else {
+      fetchSessionsList();
+      setSidebarOpen(true);
+    }
   }, [user, token]);
 
   const handleNewChat = () => {
@@ -197,8 +207,6 @@ export default function App() {
         <Sidebar
           sessions={sessions}
           sessionId={sessionId}
-          theme={theme}
-          onToggleTheme={handleToggleTheme}
           onToggleSidebar={handleToggleSidebar}
           onNewChat={handleNewChat}
           onSelectSession={handleSelectSession}
@@ -213,6 +221,8 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           onToggleSidebar={handleToggleSidebar}
           onOpenAuthModal={() => setShowAuthModal(true)}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
         />
 
         <ChatMessages

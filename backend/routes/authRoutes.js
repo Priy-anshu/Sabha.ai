@@ -208,4 +208,76 @@ router.post('/google', async (req, res) => {
   }
 });
 
+// POST /api/auth/forgot-password - Send OTP to registered email
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email address is required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'No account found with this email address' });
+    }
+
+    const otp = generateOtp();
+    user.emailOtp = otp;
+    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    await sendOtpEmail({
+      email: user.email,
+      name: user.name,
+      otp,
+      subject: 'Reset Your Password — Sabha.ai'
+    });
+
+    return res.json({
+      success: true,
+      email: user.email,
+      message: `Password reset verification code sent to ${user.email}`
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password - Verify OTP and update password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Email, OTP code, and new password are required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (user.emailOtp !== otp.trim()) {
+      return res.status(400).json({ success: false, error: 'Invalid verification code' });
+    }
+
+    if (new Date() > user.otpExpires) {
+      return res.status(400).json({ success: false, error: 'Verification code expired. Please request a new code.' });
+    }
+
+    // Update password (pre-save middleware in User.js will hash it)
+    user.password = newPassword;
+    user.emailOtp = null;
+    user.otpExpires = null;
+    user.isVerified = true;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Password reset successfully! You can now sign in with your new password.'
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

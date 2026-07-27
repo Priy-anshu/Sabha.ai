@@ -21,14 +21,14 @@ const createTransporter = () => {
 /**
  * Sends a 6-digit OTP Verification Email from Sabha.ai to user's real inbox
  */
-export async function sendOtpEmail({ email, name, otp }) {
+export async function sendOtpEmail({ email, name, otp, subject = 'Verify Your Email — Sabha.ai' }) {
   try {
     const transporter = createTransporter();
 
     const mailOptions = {
       from: `"Sabha.ai Council" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: 'Verify Your Email — Sabha.ai',
+      subject: subject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #0f172a; color: #f8fafc;">
           <h2 style="color: #38bdf8; text-align: center; font-size: 24px; margin-bottom: 5px;">Sabha<span style="color: #818cf8;">.ai</span></h2>

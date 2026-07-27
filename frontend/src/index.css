@@ -170,23 +170,24 @@ body {
 }
 
 /* Theme Toggle Button */
-.theme-toggle-btn {
+.theme-toggle-icon-btn {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   color: var(--text-main);
-  padding: 0.55rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.theme-toggle-btn:hover {
+.theme-toggle-icon-btn:hover {
   background: var(--bg-hover);
+  transform: scale(1.05);
 }
 
 .user-profile-pill {
