@@ -64,7 +64,6 @@ Use any attached document context if provided to answer the user warmly and accu
   }
 
   const transcript = [];
-  let currentProposal = '';
 
   // Step 2: Persona 1 proposes initial solution
   const persona1 = personas[0];
@@ -72,7 +71,7 @@ Use any attached document context if provided to answer the user warmly and accu
 Mindset: ${persona1.mindset}.${behaviorDirectives}
 Analyze the user request and the attached document context (if provided) and propose your initial technical/analytical solution. Use markdown hyphens (- ) for sub-item bullet lists under subheadings.`;
 
-  currentProposal = await callLLM({
+  const persona1Output = await callLLM({
     prompt: contextAugmentedPrompt,
     systemInstruction: p1Instruction,
     provider,
@@ -82,34 +81,42 @@ Analyze the user request and the attached document context (if provided) and pro
   transcript.push({
     personaName: persona1.name,
     role: persona1.role,
-    output: currentProposal
+    output: persona1Output
   });
 
-  // Step 3: Sequential debate loop across remaining personas
+  // Step 3: Delta-Only Critique Loop across remaining personas (saves tokens & prevents bloat)
   for (let i = 1; i < personas.length; i++) {
     const p = personas[i];
     const critiqueInstruction = `You are ${p.name} (${p.role}).
 Mindset: ${p.mindset}.${behaviorDirectives}
-Review the user query, attached document context, and previous solution. Critique the previous solution for flaws, security issues, performance bottlenecks, or unhandled edge cases. Present your refined version using markdown hyphens (- ) for bullet lists.`;
 
-    const nextOutput = await callLLM({
-      prompt: `${contextAugmentedPrompt}\n\nPrevious Solution by ${personas[i - 1].name}:\n${currentProposal}\n\nProvide your critique and refined proposal:`,
+DELTA-ONLY CRITIQUE INSTRUCTIONS:
+Do NOT re-write or repeat the entire previous solution. Output ONLY a concise, focused Delta Critique (100-150 words):
+1. **Flaws & Vulnerabilities**: Identify 1-3 specific weaknesses, edge cases, or security issues in the proposed solution.
+2. **Actionable Refinements**: Provide exact, technical fixes and improvements to resolve those weaknesses.
+
+Use markdown hyphens (- ) for bullet lists.`;
+
+    const previousCritiquesText = transcript.slice(1).map(t => `${t.personaName}: ${t.output}`).join('\n\n');
+    const promptForCritique = `${contextAugmentedPrompt}\n\n[Initial Proposal by ${persona1.name}]:\n${persona1Output}${previousCritiquesText ? `\n\n[Prior Persona Critiques]:\n${previousCritiquesText}` : ''}\n\nProvide your Delta Critique and Refinements:`;
+
+    const deltaOutput = await callLLM({
+      prompt: promptForCritique,
       systemInstruction: critiqueInstruction,
       provider,
       temperature: 0.4
     });
 
-    currentProposal = nextOutput;
     transcript.push({
       personaName: p.name,
       role: p.role,
-      output: nextOutput
+      output: deltaOutput
     });
   }
 
   // Step 4: Final Master Synthesizer Agent
   const synthesizerInstruction = `You are the Lead Synthesis Master Agent.
-Synthesize all persona proposals, critiques, and attached document context into a unified, well-structured final answer.${behaviorDirectives}
+Synthesize the Initial Proposal along with all Delta Critiques into a single, unified, well-structured final answer.${behaviorDirectives}
 
 STRICT MARKDOWN BULLET FORMATTING RULES:
 1. Every sub-item, test case, sub-heading point, or key principle MUST start with a markdown hyphen and space ("- ").
@@ -123,7 +130,7 @@ STRICT MARKDOWN BULLET FORMATTING RULES:
 3. Do NOT mention verifier names in the final output.`;
 
   const finalConsensus = await callLLM({
-    prompt: `${contextAugmentedPrompt}\n\nDebate Transcript:\n${transcript.map(t => `${t.personaName}: ${t.output}`).join('\n\n')}\n\nSynthesize the final answer:`,
+    prompt: `${contextAugmentedPrompt}\n\n[Initial Proposal by ${persona1.name}]:\n${persona1Output}\n\n[Persona Delta Critiques]:\n${transcript.slice(1).map(t => `${t.personaName}: ${t.output}`).join('\n\n')}\n\nSynthesize the final answer:`,
     systemInstruction: synthesizerInstruction,
     provider,
     temperature: 0.3

@@ -54,7 +54,7 @@ app.post('/api/chat/allocate-personas', async (req, res) => {
 // POST /api/chat/debate - Full Pipeline with Auth Protection for File Attachments
 app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) => {
   try {
-    const prompt = req.body.prompt;
+    const prompt = (req.body.prompt || '').trim();
     const provider = req.body.provider || 'gemini';
     const existingPersonas = req.body.existingPersonas ? JSON.parse(req.body.existingPersonas) : [];
     const behaviors = req.body.behaviors ? JSON.parse(req.body.behaviors) : [];
