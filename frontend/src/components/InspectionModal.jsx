@@ -1,8 +1,10 @@
-import React from 'react';
-import { Users, X, ShieldCheck, ShieldAlert, MessageCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Users, X, ShieldCheck, ShieldAlert, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 export default function InspectionModal({ modalData, onClose }) {
+  const [showDiscussion, setShowDiscussion] = useState(false);
+
   if (!modalData) return null;
 
   return (
@@ -38,8 +40,10 @@ export default function InspectionModal({ modalData, onClose }) {
           )}
 
           {/* Allocated Personas Section */}
-          <h4 style={{ color: '#38bdf8', marginTop: 0, marginBottom: '0.75rem' }}>👥 Allocated Personas ({modalData.personas.length})</h4>
-          {modalData.personas.map((p, idx) => (
+          <h4 style={{ color: '#38bdf8', marginTop: 0, marginBottom: '0.75rem' }}>
+            👥 Allocated Personas ({modalData.personas ? modalData.personas.length : 0})
+          </h4>
+          {modalData.personas && modalData.personas.map((p, idx) => (
             <div key={p.id || idx} className="persona-card">
               <div className="persona-card-header">
                 <span className="persona-badge">Persona {idx + 1}</span>
@@ -55,21 +59,34 @@ export default function InspectionModal({ modalData, onClose }) {
             </div>
           ))}
 
-          {/* Debate Transcript Highlights */}
+          {/* Toggle View Discussion Button & Transcript Section */}
           {modalData.transcript && modalData.transcript.length > 0 && (
             <>
-              <h4 style={{ color: '#818cf8', marginTop: '1.5rem', marginBottom: '0.75rem' }}>💬 Persona Debate Highlights</h4>
-              {modalData.transcript.map((t, idx) => (
-                <div key={idx} className="persona-card" style={{ borderLeft: '4px solid #818cf8' }}>
-                  <div className="persona-card-header">
-                    <MessageCircle size={16} color="#818cf8" />
-                    <span className="persona-name">{t.personaName}</span>
-                  </div>
-                  <div className="persona-detail markdown-body" style={{ marginTop: '0.4rem' }}>
-                    <ReactMarkdown>{t.output}</ReactMarkdown>
-                  </div>
+              <button
+                className="view-discussion-btn"
+                onClick={() => setShowDiscussion(!showDiscussion)}
+              >
+                <MessageCircle size={16} />
+                <span>{showDiscussion ? 'Hide Persona Discussion' : 'View Full Persona Discussion'}</span>
+                {showDiscussion ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {showDiscussion && (
+                <div className="transcript-discussion-container" style={{ marginTop: '1rem' }}>
+                  <h4 style={{ color: '#818cf8', marginBottom: '0.75rem' }}>💬 Full Persona Debate Discussion</h4>
+                  {modalData.transcript.map((t, idx) => (
+                    <div key={idx} className="persona-card" style={{ borderLeft: '4px solid #818cf8' }}>
+                      <div className="persona-card-header">
+                        <MessageCircle size={16} color="#818cf8" />
+                        <span className="persona-name">{t.personaName}</span>
+                      </div>
+                      <div className="persona-detail markdown-body" style={{ marginTop: '0.4rem' }}>
+                        <ReactMarkdown>{t.output}</ReactMarkdown>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </>
           )}
         </div>

@@ -895,3 +895,29 @@ body {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* View Discussion Toggle Button */
+.view-discussion-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: rgba(129, 140, 248, 0.1);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  color: #818cf8;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-discussion-btn:hover {
+  background: rgba(129, 140, 248, 0.2);
+  border-color: rgba(129, 140, 248, 0.6);
+  transform: translateY(-1px);
+}
