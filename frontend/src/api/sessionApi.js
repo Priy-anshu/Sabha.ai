@@ -5,8 +5,8 @@ export async function getSessions() {
   return res.json();
 }
 
-export async function getSessionById(sessionId) {
-  const res = await fetchWithAuth(`/api/sessions/${sessionId}`);
+export async function getSessionById(sessionId, limit = 15, offset = 0) {
+  const res = await fetchWithAuth(`/api/sessions/${sessionId}?limit=${limit}&offset=${offset}`);
   return res.json();
 }
 

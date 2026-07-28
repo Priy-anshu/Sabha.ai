@@ -2,41 +2,54 @@ import pdfParse from 'pdf-parse';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
- * Generates 768-dimensional float vector embeddings using Google's text-embedding-004 model
+ * Splits document text into overlapping chunks for Vector RAG processing
  */
+export function chunkText(text, chunkSize = 1200, overlap = 200) {
+  if (!text) return [];
+  const chunks = [];
+  let startIndex = 0;
+
+  while (startIndex < text.length) {
+    const endIndex = Math.min(startIndex + chunkSize, text.length);
+    const chunk = text.slice(startIndex, endIndex);
+    chunks.push(chunk);
+    startIndex += (chunkSize - overlap);
+  }
+
+  return chunks;
+}
+
 export async function generateEmbedding(text) {
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === 'your_gemini_api_key_here' || !text || text.trim().length === 0) {
-      return [];
-    }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.includes('your_')) return [];
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelsToTry = ['gemini-embedding-001', 'gemini-embedding-2', 'text-embedding-004'];
+  const embeddingModels = ['text-embedding-004', 'embedding-001'];
 
-    for (const modelName of modelsToTry) {
+  for (const modelName of embeddingModels) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const embeddingModel = genAI.getGenerativeModel({ model: modelName });
-        const result = await embeddingModel.embedContent(text.slice(0, 2000));
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.embedContent(text);
         if (result && result.embedding && result.embedding.values) {
           return result.embedding.values;
         }
       } catch (err) {
-        continue;
+        if (attempt < 3 && err.message && err.message.includes('fetch failed')) {
+          await new Promise(r => setTimeout(r, 800 * attempt));
+          continue;
+        }
+        break;
       }
     }
-    return [];
-  } catch (err) {
-    console.warn(`[Vector Embedding Warning]: ${err.message}`);
-    return [];
   }
+  return [];
 }
 
 /**
- * Generates vector embeddings array for all document chunks
+ * Batch generates embeddings for array of document text chunks
  */
-export async function generateEmbeddingsForChunks(chunks = []) {
-  if (!chunks || chunks.length === 0) return [];
+export async function generateChunkEmbeddings(chunks = []) {
   const embeddings = [];
 
   for (const chunk of chunks) {
@@ -44,9 +57,10 @@ export async function generateEmbeddingsForChunks(chunks = []) {
     embeddings.push(vector);
   }
 
-  console.log(`🧬 Generated ${embeddings.filter(e => e.length > 0).length}/${chunks.length} vector embeddings`);
   return embeddings;
 }
+
+export const generateEmbeddingsForChunks = generateChunkEmbeddings;
 
 /**
  * Calculates Cosine Similarity between two float vectors A and B
@@ -80,13 +94,11 @@ export async function extractTextFromFile(file) {
     // Extract from PDF
     if (mimeType === 'application/pdf' || originalName.endsWith('.pdf')) {
       const data = await pdfParse(file.buffer);
-      console.log(`📄 PDF Extracted text length: ${data.text ? data.text.length : 0} characters`);
       return data.text || '';
     }
 
     // Extract from plain text, markdown, json
     const text = file.buffer.toString('utf-8');
-    console.log(`📄 Text file extracted length: ${text.length} characters`);
     return text;
   } catch (err) {
     console.error('❌ Text extraction error:', err.message);
@@ -95,44 +107,14 @@ export async function extractTextFromFile(file) {
 }
 
 /**
- * Splits extracted document text into manageable chunks
- */
-export function chunkText(text, chunkSize = 800, overlap = 100) {
-  if (!text || text.trim().length === 0) return [];
-
-  const words = text.split(/\s+/);
-  const chunks = [];
-  let currentChunk = [];
-  let currentLength = 0;
-
-  for (const word of words) {
-    currentChunk.push(word);
-    currentLength += word.length + 1;
-
-    if (currentLength >= chunkSize) {
-      chunks.push(currentChunk.join(' '));
-      const overlapWords = currentChunk.slice(-Math.floor(overlap / 10));
-      currentChunk = [...overlapWords];
-      currentLength = currentChunk.join(' ').length;
-    }
-  }
-
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join(' '));
-  }
-
-  return chunks;
-}
-
-/**
- * Vector-Augmented Smart RAG Context Retrieval:
- * Uses Google text-embedding-004 + Cosine Similarity to find top semantic chunks (~500 tokens),
+ * Semantic Vector RAG Retrieval Engine:
+ * Compares user prompt against document chunk embeddings using Cosine Similarity.
+ * Returns top-K most relevant chunks to construct context window,
  * significantly reducing LLM token cost. Fallbacks to keyword scoring if vectors are unavailable.
  */
 export async function retrieveRelevantContext(chunks = [], userPrompt = '', rawText = '', embeddings = [], topK = 5) {
   // If small document under 15,000 characters, pass full text safely
   if (rawText && rawText.length > 0 && rawText.length < 15000) {
-    console.log(`🧠 Using FULL Document Text Context (${rawText.length} chars)`);
     return rawText;
   }
 
@@ -150,7 +132,6 @@ export async function retrieveRelevantContext(chunks = [], userPrompt = '', rawT
 
       vectorScoredChunks.sort((a, b) => b.score - a.score);
       const selectedVectorChunks = vectorScoredChunks.slice(0, topK).map(sc => sc.chunk);
-      console.log(`⚡ [Vector RAG Retrieval]: Selected top ${selectedVectorChunks.length} semantic chunks using Cosine Similarity`);
       return selectedVectorChunks.join('\n---\n');
     }
   } catch (err) {
@@ -179,7 +160,6 @@ export async function retrieveRelevantContext(chunks = [], userPrompt = '', rawT
 
   scoredChunks.sort((a, b) => b.score - a.score);
   const selected = scoredChunks.slice(0, topK).map(sc => sc.chunk);
-  console.log(`🔍 [Keyword RAG Retrieval]: Selected top ${selected.length} keyword-matched chunks`);
 
   return selected.join('\n---\n');
 }

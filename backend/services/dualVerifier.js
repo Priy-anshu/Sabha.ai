@@ -51,14 +51,15 @@ If missing details exist, list what was missed and how to improve it.`;
 
   // 3. If any verifier flagged issues, run a final Refinement Agent
   if (!factApproved || !completenessApproved) {
-    console.log('🔍 Dual Verifiers flagged refinements. Producing final audited response...');
 
     const refinerInstruction = `You are the Lead Quality Assurance Refiner.
 Your job is to take an initial proposed answer and refine it using feedback from 2 Dual Verifiers:
 1. Fact Auditor Feedback: ${factAuditResult}
 2. Completeness Auditor Feedback: ${completenessAuditResult}
 
-FORMATTING RULE: Preserve markdown bullet points (- ) for all sub-items under headings.
+FORMATTING RULES:
+1. Preserve markdown bullet points (- ) for all sub-items under headings.
+2. ALWAYS preserve or include the final conclusion section ("### 💡 Key Takeaway & Conclusion") and the 3 follow-up questions ("### ❓ Suggested Follow-Up Questions") at the end.
 Produce a final, polished, error-free answer addressing all feedback. Do NOT include verifier names or meta commentary in your response.`;
 
     finalVerifiedOutput = await callLLM({

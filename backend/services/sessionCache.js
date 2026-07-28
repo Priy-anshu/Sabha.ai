@@ -16,7 +16,6 @@ export async function getSessionContext(sessionId) {
   if (sessionMap.has(sessionId)) {
     const cached = sessionMap.get(sessionId);
     cached.lastAccessed = Date.now();
-    console.log(`⚡ [Session Cache HIT]: Retrieved context instantly for ${sessionId}`);
     return cached;
   }
 
@@ -48,10 +47,9 @@ export async function getSessionContext(sessionId) {
     }
 
     sessionMap.set(sessionId, sessionData);
-    console.log(`💾 [Session Cache LOAD]: Loaded ChatSummary from MongoDB for ${sessionId}`);
     return sessionData;
   } catch (err) {
-    console.warn(`[Session Cache Error]: ${err.message}`);
+    console.warn(`[Session Cache Warning]: ${err.message}`);
     return { summary: '', recentTurns: [] };
   }
 }
@@ -96,7 +94,7 @@ export async function updateSessionContext(sessionId, userPrompt, assistantAnswe
       { upsert: true, new: true }
     );
   } catch (err) {
-    console.warn(`[Summary Distillation/Persist Warning]: ${err.message}`);
+    console.warn(`[Summary Distillation Warning]: ${err.message}`);
   }
 
   sessionMap.set(sessionId, {
@@ -104,8 +102,6 @@ export async function updateSessionContext(sessionId, userPrompt, assistantAnswe
     recentTurns: updatedTurns,
     lastAccessed: Date.now()
   });
-
-  console.log(`⚡ [Session Cache & ChatSummary DB UPDATED]: Cached & saved summary for ${sessionId}`);
 }
 
 /**

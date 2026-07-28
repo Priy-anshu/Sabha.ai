@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
-import { sendOtpEmail } from '../services/emailService.js';
+import { sendOtpEmail, sendWelcomeEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -105,6 +105,11 @@ router.post('/verify-otp', async (req, res) => {
     user.otpExpires = null;
     await user.save();
 
+    // Send Onboarding Welcome Email via Brevo API in background
+    sendWelcomeEmail({ email: user.email, name: user.name }).catch(err =>
+      console.warn('⚠️ Could not send welcome email:', err.message)
+    );
+
     const token = generateToken(user.userId, user.email, user.name);
 
     return res.json({
@@ -186,6 +191,10 @@ router.post('/google', async (req, res) => {
         authProvider: 'google',
         isVerified: true
       });
+      // Send Welcome Email for new Google Signup
+      sendWelcomeEmail({ email: user.email, name: user.name }).catch(err =>
+        console.warn('⚠️ Could not send welcome email:', err.message)
+      );
     } else {
       user.isVerified = true;
       await user.save();

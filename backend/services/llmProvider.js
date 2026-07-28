@@ -21,7 +21,6 @@ async function withRetry(fn, retries = 2, delay = 800) {
         err.message.includes('socket hang up')
       );
       if (isNetworkError && i < retries - 1) {
-        console.warn(`[LLM Network Warning]: ${err.message}. Retrying attempt ${i + 2}/${retries}...`);
         await new Promise(r => setTimeout(r, delay * (i + 1)));
         continue;
       }
@@ -29,6 +28,57 @@ async function withRetry(fn, retries = 2, delay = 800) {
     }
   }
   throw lastErr;
+}
+
+/**
+ * Direct Gemini Call with Model Fallback
+ */
+async function callGeminiDirect({ prompt, systemInstruction, temperature }) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    throw new Error('GEMINI_API_KEY is not configured in backend/.env');
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const modelsToTry = [
+    'gemini-flash-latest',
+    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash'
+  ];
+
+  let lastError;
+  for (const modelName of modelsToTry) {
+    try {
+      return await withRetry(async () => {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          systemInstruction: systemInstruction || undefined
+        });
+
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature }
+        });
+
+        return result.response.text();
+      });
+    } catch (err) {
+      lastError = err;
+      const isModelUnavailableOrQuota = err.message && (
+        err.message.includes('404') ||
+        err.message.includes('no longer available') ||
+        err.message.includes('429') ||
+        err.message.includes('Quota exceeded') ||
+        err.message.includes('RESOURCE_EXHAUSTED')
+      );
+      if (isModelUnavailableOrQuota) {
+        console.warn(`🚨 [QUOTA / RATE LIMIT - Gemini ${modelName}]: Switching to next model...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
 }
 
 /**
@@ -63,118 +113,72 @@ async function callGroq({ prompt, systemInstruction, temperature }) {
       });
     } catch (err) {
       lastErr = err;
-      console.warn(`[Groq Model ${model} Warning]: ${err.message}. Trying next Groq model...`);
+      const isQuotaOrLimit = err.message && (
+        err.message.includes('429') ||
+        err.message.includes('Rate limit') ||
+        err.message.includes('tokens per minute')
+      );
+      if (isQuotaOrLimit) {
+        console.warn(`🚨 [QUOTA / RATE LIMIT - Groq ${model}]: Switching to next Groq model...`);
+        continue;
+      }
     }
   }
-  throw lastErr;
+
+  // If ALL Groq models exhaust, fallback back to Gemini Ring!
+  console.warn('⚡ [ALL GROQ MODELS EXHAUSTED]: Falling back to Gemini AI Ring...');
+  return await callGeminiDirect({ prompt, systemInstruction, temperature });
 }
 
 /**
- * Unified LLM Provider Service
- * Supports Google Gemini (with 500 RPD Lite models priority), Groq (14,400 RPD fallback), OpenAI, and Grok (xAI).
+ * Unified LLM Provider Service with 360-Degree Fallback Ring Loop:
+ * Gemini (3 models) <---> Groq (3 models)
  */
 export async function callLLM({ prompt, systemInstruction = '', provider = process.env.DEFAULT_PROVIDER || 'gemini', temperature = 0.7 }) {
   const selectedProvider = provider.toLowerCase();
 
   try {
     if (selectedProvider === 'gemini') {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-        throw new Error('GEMINI_API_KEY is not configured in backend/.env');
-      }
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      // Prioritize High-Quota 500 RPD Lite models first so tokens stay longer!
-      const modelsToTry = [
-        'gemini-3.5-flash-lite',
-        'gemini-3.1-flash-lite',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash-lite',
-        'gemini-flash-lite-latest',
-        'gemini-3.5-flash',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-flash-latest'
-      ];
-
-      let lastError;
-      for (const modelName of modelsToTry) {
-        try {
-          return await withRetry(async () => {
-            const model = genAI.getGenerativeModel({
-              model: modelName,
-              systemInstruction: systemInstruction || undefined
-            });
-
-            const result = await model.generateContent({
-              contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              generationConfig: { temperature }
-            });
-
-            return result.response.text();
-          });
-        } catch (err) {
-          lastError = err;
-          const isModelUnavailableOrQuota = err.message && (
-            err.message.includes('404') ||
-            err.message.includes('no longer available') ||
-            err.message.includes('429') ||
-            err.message.includes('Quota exceeded') ||
-            err.message.includes('RESOURCE_EXHAUSTED')
-          );
-          if (isModelUnavailableOrQuota) {
-            console.warn(`[Gemini Model ${modelName} Quota Exceeded]: Switching to next available Gemini model...`);
-            continue;
-          }
-          throw err;
+      try {
+        return await callGeminiDirect({ prompt, systemInstruction, temperature });
+      } catch (geminiErr) {
+        if (process.env.GROQ_API_KEY) {
+          console.warn('⚡ [ALL GEMINI MODELS EXHAUSTED]: Switching to Groq AI 14,400 RPD Fallback Ring...');
+          return await callGroq({ prompt, systemInstruction, temperature });
         }
+        throw geminiErr;
       }
-
-      // If ALL Gemini models hit rate limit or fail, fallback to Groq (14,400 RPD limit)!
-      if (process.env.GROQ_API_KEY) {
-        console.warn('⚠️ All Gemini models exhausted. Switching to Groq AI Fallback...');
-        return await callGroq({ prompt, systemInstruction, temperature });
-      }
-
-      throw lastError;
     }
 
     if (selectedProvider === 'groq') {
-      return await callGroq({ prompt, systemInstruction, temperature });
-    }
-
-    if (selectedProvider === 'openai' || selectedProvider === 'grok') {
-      const apiKey = selectedProvider === 'grok' ? process.env.GROK_API_KEY : process.env.OPENAI_API_KEY;
-      const baseURL = selectedProvider === 'grok' ? 'https://api.x.ai/v1' : undefined;
-
-      if (!apiKey || apiKey.includes('your_')) {
-        throw new Error(`${selectedProvider.toUpperCase()}_API_KEY is not configured in backend/.env`);
+      try {
+        return await callGroq({ prompt, systemInstruction, temperature });
+      } catch (groqErr) {
+        console.warn('⚡ [ALL GROQ MODELS EXHAUSTED]: Switching to Gemini AI Fallback Ring...');
+        return await callGeminiDirect({ prompt, systemInstruction, temperature });
       }
-
-      const openai = new OpenAI({ apiKey, baseURL });
-      const model = selectedProvider === 'grok' ? 'grok-beta' : 'gpt-4o-mini';
-
-      return await withRetry(async () => {
-        const messages = [];
-        if (systemInstruction) {
-          messages.push({ role: 'system', content: systemInstruction });
-        }
-        messages.push({ role: 'user', content: prompt });
-
-        const completion = await openai.chat.completions.create({
-          model,
-          messages,
-          temperature
-        });
-
-        return completion.choices[0]?.message?.content || '';
-      });
     }
 
-    throw new Error(`Unsupported LLM provider requested: ${selectedProvider}`);
+    if (selectedProvider === 'openai') {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey || apiKey.includes('your_')) {
+        throw new Error('OPENAI_API_KEY is not configured in backend/.env');
+      }
+      const openai = new OpenAI({ apiKey });
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+          { role: 'user', content: prompt }
+        ],
+        temperature
+      });
+      return completion.choices[0]?.message?.content || '';
+    }
+
+    throw new Error(`Unsupported LLM provider: ${provider}`);
   } catch (error) {
-    console.error(`[LLM Service Error - ${selectedProvider}]:`, error.message);
+    console.error(`❌ [LLM PROVIDER FATAL ERROR]: ${error.message}`);
     throw error;
   }
 }

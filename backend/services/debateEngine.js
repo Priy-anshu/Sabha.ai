@@ -47,6 +47,7 @@ export async function runDebate({ userPrompt, personas, provider = 'gemini', doc
 
   // Handle single-persona casual chat bypass
   if (personas.length === 1) {
+    const singlePersona = personas[0];
     const pName = singlePersona.name.includes('(') ? singlePersona.name : `${singlePersona.name} (${singlePersona.role})`;
     if (onProgress) {
       onProgress({
@@ -59,7 +60,16 @@ export async function runDebate({ userPrompt, personas, provider = 'gemini', doc
 
     const systemPrompt = `You are ${singlePersona.name}, acting in the role of ${singlePersona.role}.
 Mindset: ${singlePersona.mindset}.${behaviorDirectives}
-Use any attached document context if provided to answer the user warmly and accurately. Use markdown bullet points (- ) for sub-items.`;
+Use any attached document context if provided to answer the user warmly and accurately. Use markdown bullet points (- ) for sub-items.
+
+ALWAYS CONCLUDE YOUR RESPONSE WITH:
+### 💡 Key Takeaway & Conclusion
+- [1-2 sentence executive summary concluding the response]
+
+### ❓ Suggested Follow-Up Questions
+- [Relevant follow-up question 1]
+- [Relevant follow-up question 2]
+- [Relevant follow-up question 3]`;
 
     const singleResponse = await callLLM({
       prompt: contextAugmentedPrompt,
@@ -83,17 +93,16 @@ Use any attached document context if provided to answer the user warmly and accu
   }
 
   const transcript = [];
-  const MAX_ROUNDS = 3;
+  const MAX_ROUNDS = 2;
   let consensusReached = false;
   let currentProposal = '';
   let finalRoundReached = 1;
 
   const persona1 = personas[0];
 
-  // 🔄 3-ROUND CONSENSUS LOOP
+  // 🔄 2-ROUND CONSENSUS LOOP
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     finalRoundReached = round;
-    console.log(`🗣️ Starting Debate Round ${round}/${MAX_ROUNDS}...`);
 
     if (onProgress) {
       onProgress({
@@ -216,7 +225,6 @@ Below the status line, provide your concise feedback (100-150 words) using markd
 
     // Check if Unanimous Agreement was reached in this round
     if (roundDissenters === 0) {
-      console.log(`🎉 Unanimous Consensus reached by all personas in Round ${round}!`);
       consensusReached = true;
       if (onProgress) {
         onProgress({
@@ -232,11 +240,10 @@ Below the status line, provide your concise feedback (100-150 words) using markd
   // ⚖️ FALLBACK VOTING & TIE-BREAKER LOOP (If still not unanimous after 3 Rounds)
   let votingSummary = '';
   if (!consensusReached) {
-    console.log('⚖️ Unanimous agreement not reached after 3 rounds. Triggering Fallback Majority Voting Loop...');
     if (onProgress) {
       onProgress({
-        title: `⚖️ Triggering Fallback Majority Voting Loop`,
-        detail: '3 rounds completed without 100% agreement. Collecting final ballots...',
+        title: '⚖️ Triggering Fallback Majority Voting Loop',
+        detail: `${MAX_ROUNDS} rounds completed without 100% agreement. Collecting final ballots...`,
         status: 'in_progress'
       });
     }
@@ -245,7 +252,7 @@ Below the status line, provide your concise feedback (100-150 words) using markd
     for (const p of personas) {
       const voteInstruction = `You are ${p.name} (${p.role}).
 Mindset: ${p.mindset}.${behaviorDirectives}
-The council has completed 3 rounds of debate. Cast your final vote on the core solution.
+The council has completed ${MAX_ROUNDS} rounds of debate. Cast your final vote on the core solution.
 State: "FINAL VOTE: APPROVE" or "FINAL VOTE: APPROVE WITH CONDITIONS" or "FINAL VOTE: DISSENT".
 List 1 key reason for your vote.`;
 
@@ -271,7 +278,7 @@ List 1 key reason for your vote.`;
 
   // Step 4: Final Master Synthesizer Agent
   const synthesizerInstruction = `You are the Lead Synthesis Master Agent.
-${consensusReached ? 'Unanimous consensus was achieved by all council personas.' : 'A 3-round debate concluded with a majority vote decision.'}
+${consensusReached ? 'Unanimous consensus was achieved by all council personas.' : `A ${MAX_ROUNDS}-round debate concluded with a majority vote decision.`}
 Synthesize the final proposal, persona critiques, and voting results into a single, unified, well-structured answer.${behaviorDirectives}
 
 STRICT MARKDOWN BULLET FORMATTING RULES:
@@ -283,7 +290,16 @@ STRICT MARKDOWN BULLET FORMATTING RULES:
    - **The Legacy of Contribution:** Do they elevate human dignity...
 
 2. NEVER output key-value items as un-bulleted plain lines under subheadings. Every sub-item MUST start with "- ".
-3. Do NOT mention verifier names in the final output.`;
+3. Do NOT mention verifier names in the final output.
+
+ALWAYS CONCLUDE YOUR RESPONSE AT THE VERY END WITH:
+### 💡 Key Takeaway & Conclusion
+- [1-2 sentence crisp executive summary concluding the response]
+
+### ❓ Suggested Follow-Up Questions
+- [Relevant follow-up question 1 to keep the conversation going]
+- [Relevant follow-up question 2]
+- [Relevant follow-up question 3]`;
 
   const finalConsensus = await callLLM({
     prompt: `${contextAugmentedPrompt}\n\n[Final Proposal]:\n${currentProposal}\n\n[Debate Transcript Across ${finalRoundReached} Rounds]:\n${transcript.map(t => `Round ${t.round} - ${t.personaName} (${t.vote}): ${t.output}`).join('\n\n')}${votingSummary}\n\nSynthesize the final answer:`,

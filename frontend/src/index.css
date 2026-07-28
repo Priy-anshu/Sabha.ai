@@ -1128,3 +1128,275 @@ body {
 .scroll-bottom-btn:hover svg {
   color: #0f172a !important;
 }
+
+/* ==========================================================================
+   Live Multi-Agent Reasoning Box Card Styling
+   ========================================================================== */
+.live-thinking-box-card {
+  margin: 0.75rem 0;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.thinking-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.6);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+  cursor: pointer;
+  user-select: none;
+}
+
+.thinking-box-header:hover {
+  background: rgba(30, 41, 59, 0.85);
+}
+
+.thinking-box-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.thinking-step-count {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.thinking-box-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thinking-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.thinking-box-body {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-behavior: smooth;
+}
+
+.thinking-box-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.thinking-box-body::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 4px;
+}
+
+@keyframes fadeInThinkingItem {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.thinking-log-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(148, 163, 184, 0.2);
+  animation: fadeInThinkingItem 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 0.2s ease;
+}
+
+.thinking-log-item.active-step {
+  border-left-color: #38bdf8;
+}
+
+.thinking-log-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.thinking-log-title {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thinking-log-time {
+  font-size: 0.7rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.thinking-log-detail {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.line-typewriter-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.typewriter-line {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #94a3b8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  animation: fadeInThinkingItem 0.2s ease-out forwards;
+}
+
+/* ==========================================================================
+   Skeleton Loader & Instant Chat Selection Styling
+   ========================================================================== */
+.skeleton-chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-top: 1rem;
+  width: 100%;
+}
+
+.skeleton-bubble {
+  opacity: 0.85;
+  animation: skeletonPulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes skeletonPulse {
+  0% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0.85;
+  }
+}
+
+.skeleton-line {
+  height: 14px;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.1), rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.1));
+  background-size: 200% 100%;
+  animation: skeletonShimmer 2s infinite;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-line.skeleton-title {
+  height: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  margin-bottom: 0;
+}
+
+/* ==========================================================================
+   Load Earlier Messages Pagination Button
+   ========================================================================== */
+.load-more-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.load-more-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(6px);
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+  transform: translateY(-1px);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Centered Floating "Scroll to Latest Output" Button (Positioned Above Input)
+   ========================================================================== */
+.scroll-bottom-btn-centered {
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(56, 189, 248, 0.25);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.scroll-bottom-btn-centered:hover {
+  background: #38bdf8;
+  color: #0f172a;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+  transform: translateX(-50%) translateY(-2px);
+}
+
+
+

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 import Sidebar from './components/Sidebar.jsx';
 import ChatHeader from './components/ChatHeader.jsx';
 import ChatMessages from './components/ChatMessages.jsx';
@@ -22,6 +23,16 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
+
+  // Instant Loading & Pagination States
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [totalMessageCount, setTotalMessageCount] = useState(0);
+  const [messageOffset, setMessageOffset] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [userHasScrolledUp, setUserHasScrolledUp] = useState(false);
+
+  const messagesEndRef = useRef(null);
 
   // Agent Behaviors State
   const [selectedBehaviors, setSelectedBehaviors] = useState(() => {
@@ -106,20 +117,68 @@ export default function App() {
     setActivePersona(null);
     setAttachedFile(null);
     setLoading(false);
+    setIsSessionLoading(false);
+    setHasMoreMessages(false);
+    setMessageOffset(0);
+    setUserHasScrolledUp(false);
   };
 
   const handleSelectSession = async (sId) => {
+    if (loading && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    // Instant 0ms UI Feedback: Immediately highlight session and display Skeleton Loader
+    setSessionId(sId);
+    setMessages([]);
+    setActivePersonas([]);
+    setLiveSteps([]);
+    setActivePersona(null);
+    setIsSessionLoading(true);
+    setHasMoreMessages(false);
+    setMessageOffset(0);
+    setUserHasScrolledUp(false);
+
     try {
-      setLiveSteps([]);
-      setActivePersona(null);
-      const data = await getSessionById(sId);
+      const data = await getSessionById(sId, 15, 0);
       if (data.success && data.session) {
-        setSessionId(data.session.sessionId);
         setMessages(data.session.messages || []);
         setActivePersonas(data.session.activePersonas || []);
+        setHasMoreMessages(data.session.hasMore || false);
+        setTotalMessageCount(data.session.totalCount || 0);
       }
     } catch (err) {
       console.error('Error loading session:', err.message);
+    } finally {
+      setIsSessionLoading(false);
+    }
+  };
+
+  const handleLoadMoreMessages = async () => {
+    if (isLoadingMore || !hasMoreMessages) return;
+    const nextOffset = messageOffset + 15;
+    setIsLoadingMore(true);
+    try {
+      const data = await getSessionById(sessionId, 15, nextOffset);
+      if (data.success && data.session) {
+        const olderMessages = data.session.messages || [];
+        setMessages(prev => {
+          const combined = [...olderMessages, ...prev];
+          const seen = new Set();
+          return combined.filter(m => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+          });
+        });
+        const currentTotalCount = data.session.totalCount || totalMessageCount;
+        const newTotalFetched = nextOffset + olderMessages.length;
+        setHasMoreMessages(data.session.hasMore && newTotalFetched < currentTotalCount);
+        setMessageOffset(nextOffset);
+      }
+    } catch (err) {
+      console.error('Error loading earlier messages:', err.message);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -307,15 +366,37 @@ export default function App() {
         <ChatMessages
           messages={messages}
           loading={loading}
+          isSessionLoading={isSessionLoading}
+          hasMore={hasMoreMessages}
+          totalCount={totalMessageCount}
+          onLoadMore={handleLoadMoreMessages}
+          isLoadingMore={isLoadingMore}
           liveSteps={liveSteps}
           activePersona={activePersona}
           onInspectModal={setModalData}
           onSelectSuggestion={(suggestionText) => {
             setInput(suggestionText);
           }}
+          userHasScrolledUp={userHasScrolledUp}
+          setUserHasScrolledUp={setUserHasScrolledUp}
+          messagesEndRef={messagesEndRef}
         />
 
         <div className={`input-wrapper-container ${isNewChat ? 'centered-input-wrapper' : ''}`}>
+          {userHasScrolledUp && !isNewChat && !isSessionLoading && (
+            <button
+              className="scroll-bottom-btn-centered"
+              title="Scroll to latest output"
+              onClick={() => {
+                setUserHasScrolledUp(false);
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <ChevronDown size={15} />
+              <span>Scroll to latest</span>
+            </button>
+          )}
+
           <ChatInput
             input={input}
             setInput={setInput}

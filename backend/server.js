@@ -225,7 +225,6 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
     // Step RAG 1: If user is logged in & attached a file
     if (req.file && !isGuestUser) {
       attachedFileName = req.file.originalname;
-      console.log(`📄 Processing attached file for user ${req.user.email}: ${attachedFileName}`);
       const rawText = await extractTextFromFile(req.file);
       const chunks = chunkText(rawText);
       const embeddings = await generateEmbeddingsForChunks(chunks);
@@ -249,7 +248,6 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
       if (existingDocs && existingDocs.length > 0) {
         const latestDoc = existingDocs[0];
         attachedFileName = latestDoc.fileName;
-        console.log(`🧠 Reusing stored ChatDoc memory for session ${sessionId}: ${attachedFileName}`);
         documentContext = await retrieveRelevantContext(latestDoc.chunks, prompt, latestDoc.rawText, latestDoc.embeddings);
       }
     }

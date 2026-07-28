@@ -19,17 +19,29 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-// GET /api/sessions/:sessionId - Get specific session metadata + detailed messages
+// GET /api/sessions/:sessionId - Get specific session metadata + paginated messages (latest first)
 router.get('/:sessionId', protect, async (req, res) => {
   try {
     const { sessionId } = req.params;
+    const limit = parseInt(req.query.limit) || 15;
+    const offset = parseInt(req.query.offset) || 0;
+
     const session = await ChatSession.findOne({ sessionId });
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
 
-    // Fetch turn-by-turn message history from ChatDetails
-    const details = await ChatDetails.find({ sessionId }).sort({ timestamp: 1 });
+    const totalCount = await ChatDetails.countDocuments({ sessionId });
+    const skipCount = Math.max(0, totalCount - limit - offset);
+    const fetchLimit = Math.min(limit, Math.max(0, totalCount - offset));
+
+    let details = [];
+    if (fetchLimit > 0) {
+      details = await ChatDetails.find({ sessionId })
+        .sort({ timestamp: 1 })
+        .skip(skipCount)
+        .limit(fetchLimit);
+    }
 
     const formattedMessages = details.map(d => ({
       id: d.messageId,
@@ -41,13 +53,17 @@ router.get('/:sessionId', protect, async (req, res) => {
       attachmentName: d.attachmentName || ''
     }));
 
+    const hasMore = totalCount > (limit + offset);
+
     return res.json({
       success: true,
       session: {
         sessionId: session.sessionId,
         title: session.title,
         activePersonas: session.activePersonas,
-        messages: formattedMessages
+        messages: formattedMessages,
+        hasMore,
+        totalCount
       }
     });
   } catch (err) {
