@@ -82,24 +82,29 @@ export function cosineSimilarity(vecA, vecB) {
 }
 
 /**
- * Extracts plain text from an uploaded file buffer (.pdf, .txt, .md, .json)
+ * Universal Text Extraction Engine:
+ * Extracts text from PDFs, Code files (.js, .py, .ts, .java, .cpp, .html, .css, etc.),
+ * Spreadsheets (.csv), Data files (.json, .sql, .xml, .yaml), and Text/Markdown.
  */
 export async function extractTextFromFile(file) {
-  if (!file) return '';
+  if (!file || !file.buffer) return '';
 
-  const mimeType = file.mimetype;
-  const originalName = file.originalname.toLowerCase();
+  const mimeType = file.mimetype || '';
+  const originalName = (file.originalname || '').toLowerCase();
 
   try {
-    // Extract from PDF
+    // 1. PDF Documents
     if (mimeType === 'application/pdf' || originalName.endsWith('.pdf')) {
       const data = await pdfParse(file.buffer);
       return data.text || '';
     }
 
-    // Extract from plain text, markdown, json
+    // 2. Universal Code, Data, Text & Spreadsheet Files (.js, .py, .csv, .json, .html, .sql, etc.)
     const text = file.buffer.toString('utf-8');
-    return text;
+    
+    // Strip null bytes or unprintable control characters if present
+    const cleanText = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    return cleanText;
   } catch (err) {
     console.error('❌ Text extraction error:', err.message);
     return '';

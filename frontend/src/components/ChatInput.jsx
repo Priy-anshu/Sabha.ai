@@ -91,7 +91,7 @@ export default function ChatInput({
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept=".pdf,.txt,.md,.json"
+          accept="*"
           style={{ display: 'none' }}
         />
 
@@ -99,7 +99,7 @@ export default function ChatInput({
           className="attach-btn"
           onClick={handlePaperclipClick}
           disabled={loading}
-          title={user ? "Attach PDF or document to Sabha.ai" : "Sign In to attach documents"}
+          title={user ? "Attach code, document, spreadsheet, or data file to Sabha.ai" : "Sign In to attach documents"}
           style={{ background: 'transparent', border: 'none', color: attachedFile ? '#38bdf8' : '#94a3b8', cursor: loading ? 'not-allowed' : 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', alignSelf: 'flex-end', marginBottom: '4px' }}
         >
           <Paperclip size={20} />
