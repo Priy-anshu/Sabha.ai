@@ -21,6 +21,14 @@ const BEHAVIOR_PROMPT_MAP = {
   sarcastic: "Use subtle dry humor, wit, and sarcasm while still providing technically precise and accurate information."
 };
 
+const HUMAN_READABLE_DIRECTIVE = `
+
+LANGUAGE & READABILITY RULES:
+- Write in clear, natural, human-friendly language using simple and easy-to-read words.
+- Avoid unnecessarily complex jargon, dense corporate buzzwords, or convoluted phrasing.
+- Explain technical ideas simply and directly as if talking to a smart friend.
+- Keep sentences concise, direct, and easy to follow. Use complex terms ONLY if strictly necessary for technical accuracy.`;
+
 function buildBehaviorPrompt(behaviors = []) {
   if (!behaviors || !Array.isArray(behaviors) || behaviors.length === 0) return '';
   const directives = behaviors.map(b => BEHAVIOR_PROMPT_MAP[b]).filter(Boolean);
@@ -60,6 +68,7 @@ export async function runDebate({ userPrompt, personas, provider = 'gemini', doc
 
     const systemPrompt = `You are ${singlePersona.name}, acting in the role of ${singlePersona.role}.
 Mindset: ${singlePersona.mindset}.${behaviorDirectives}
+${HUMAN_READABLE_DIRECTIVE}
 Use any attached document context if provided to answer the user warmly and accurately. Use markdown bullet points (- ) for sub-items.
 
 ALWAYS CONCLUDE YOUR RESPONSE WITH:
@@ -117,7 +126,8 @@ ALWAYS CONCLUDE YOUR RESPONSE WITH:
     if (round === 1) {
       const p1Instruction = `You are ${persona1.name} (${persona1.role}).
 Mindset: ${persona1.mindset}.${behaviorDirectives}
-Analyze the user request and attached document context (if provided). Propose your initial technical/analytical solution. Use markdown hyphens (- ) for sub-item bullet lists under subheadings.`;
+${HUMAN_READABLE_DIRECTIVE}
+Analyze the user request and attached document context (if provided). Propose your initial solution in clear, readable, human-friendly language. Use markdown hyphens (- ) for sub-item bullet lists under subheadings.`;
 
       currentProposal = await callLLM({
         prompt: contextAugmentedPrompt,
@@ -137,7 +147,8 @@ Analyze the user request and attached document context (if provided). Propose yo
       // In Round 2 & 3: Persona 1 updates the proposal addressing prior critiques
       const p1RefineInstruction = `You are ${persona1.name} (${persona1.role}).
 Mindset: ${persona1.mindset}.${behaviorDirectives}
-Review the critiques from other personas. Update and refine your proposal to address their concerns, resolve flaws, and achieve consensus. Use markdown hyphens (- ) for bullet lists.`;
+${HUMAN_READABLE_DIRECTIVE}
+Review the critiques from other personas. Update and refine your proposal to address their concerns in simple, clear, human-readable language. Use markdown hyphens (- ) for bullet lists.`;
 
       const priorCritiques = transcript.filter(t => t.round === round - 1 && t.personaName !== persona1.name).map(t => `${t.personaName}: ${t.output}`).join('\n\n');
       currentProposal = await callLLM({
@@ -180,6 +191,7 @@ Review the critiques from other personas. Update and refine your proposal to add
 
       const critiqueInstruction = `You are ${p.name} (${p.role}).
 Mindset: ${p.mindset}.${behaviorDirectives}
+${HUMAN_READABLE_DIRECTIVE}
 
 CONSENSUS REVIEW & CRITIQUE INSTRUCTIONS:
 Evaluate the latest proposal by ${persona1.name}.
@@ -187,7 +199,7 @@ At the VERY FIRST LINE of your response, write your explicit status:
 - Write "STATUS: AGREED" if the proposal satisfactorily addresses all major technical, security, and performance concerns.
 - Write "STATUS: DISAGREED" if critical flaws, missing edge cases, or unhandled risks remain.
 
-Below the status line, provide your concise feedback (100-150 words) using markdown hyphens (- ) for bullet lists.`;
+Below the status line, provide your concise feedback (100-150 words) in simple, human-readable words using markdown hyphens (- ) for bullet lists.`;
 
       const deltaOutput = await callLLM({
         prompt: `${contextAugmentedPrompt}\n\n[Current Refined Proposal by ${persona1.name}]:\n${currentProposal}\n\nReview and provide your STATUS (AGREED or DISAGREED) and concise feedback:`,
@@ -254,7 +266,7 @@ Below the status line, provide your concise feedback (100-150 words) using markd
 Mindset: ${p.mindset}.${behaviorDirectives}
 The council has completed ${MAX_ROUNDS} rounds of debate. Cast your final vote on the core solution.
 State: "FINAL VOTE: APPROVE" or "FINAL VOTE: APPROVE WITH CONDITIONS" or "FINAL VOTE: DISSENT".
-List 1 key reason for your vote.`;
+List 1 key reason for your vote in clear, simple words.`;
 
       const voteOutput = await callLLM({
         prompt: `${contextAugmentedPrompt}\n\n[Final Proposal]:\n${currentProposal}\n\nCast your final vote and 1-sentence rationale:`,
@@ -280,29 +292,29 @@ List 1 key reason for your vote.`;
   const synthesizerInstruction = `You are the Lead Synthesis Master Agent.
 ${consensusReached ? 'Unanimous consensus was achieved by all council personas.' : `A ${MAX_ROUNDS}-round debate concluded with a majority vote decision.`}
 Synthesize the final proposal, persona critiques, and voting results into a single, unified, well-structured answer.${behaviorDirectives}
+${HUMAN_READABLE_DIRECTIVE}
 
 STRICT MARKDOWN BULLET FORMATTING RULES:
 1. Every sub-item, test case, sub-heading point, or key principle MUST start with a markdown hyphen and space ("- ").
-   Example:
-   ### How to Test It:
-   - **The Test of Adversity:** Does their character hold up when things fall apart...
-   - **The Principle of Anonymity:** Would they still strive for virtue...
-   - **The Legacy of Contribution:** Do they elevate human dignity...
-
-2. NEVER output key-value items as un-bulleted plain lines under subheadings. Every sub-item MUST start with "- ".
-3. Do NOT mention verifier names in the final output.
+2. Write in clear, direct, human-friendly language. Avoid overly complex academic vocabulary or dense corporate buzzwords.
+3. NEVER output key-value items as un-bulleted plain lines under subheadings. Every sub-item MUST start with "- ".
+4. Do NOT mention verifier names in the final output.
 
 ALWAYS CONCLUDE YOUR RESPONSE AT THE VERY END WITH:
 ### 💡 Key Takeaway & Conclusion
-- [1-2 sentence crisp executive summary concluding the response]
+- [1-2 sentence executive summary in simple, plain language concluding the response]
 
 ### ❓ Suggested Follow-Up Questions
 - [Relevant follow-up question 1 to keep the conversation going]
 - [Relevant follow-up question 2]
 - [Relevant follow-up question 3]`;
 
+  const transcriptText = transcript
+    .map(t => `Round ${t.round} - ${t.personaName} (${t.vote}): ${t.output}`)
+    .join('\n\n');
+
   const finalConsensus = await callLLM({
-    prompt: `${contextAugmentedPrompt}\n\n[Final Proposal]:\n${currentProposal}\n\n[Debate Transcript Across ${finalRoundReached} Rounds]:\n${transcript.map(t => `Round ${t.round} - ${t.personaName} (${t.vote}): ${t.output}`).join('\n\n')}${votingSummary}\n\nSynthesize the final answer:`,
+    prompt: `${contextAugmentedPrompt}\n\n[Final Proposal]:\n${currentProposal}\n\n[Debate Transcript Across ${finalRoundReached} Rounds]:\n${transcriptText}${votingSummary}\n\nSynthesize the final answer:`,
     systemInstruction: synthesizerInstruction,
     provider,
     temperature: 0.3

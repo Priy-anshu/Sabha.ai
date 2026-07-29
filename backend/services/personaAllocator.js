@@ -5,19 +5,23 @@ import { callLLM } from './llmProvider.js';
  */
 function isCasualConversation(prompt) {
   if (!prompt || typeof prompt !== 'string') return false;
-  const clean = prompt.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
+  const clean = prompt.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ');
 
-  const casualPhrases = [
-    'hi', 'hello', 'hey', 'namaste', 'good morning', 'good evening',
-    'thanks', 'thank you', 'how are you', 'how are you doing', 'how is it going',
-    'who are you', 'what can you do', 'sup', 'yo', 'nice to meet you', 'am fine', 'i am fine', 'im fine'
+  // Any prompt with a question mark or question words is NEVER casual conversation
+  const questionWords = ['what', 'why', 'how', 'when', 'where', 'who', 'can', 'explain', 'tell', 'describe', 'is', 'are', 'should', 'which', 'fix', 'build', 'create', 'write', 'help'];
+  const hasQuestionWord = questionWords.some(qw => clean.startsWith(qw + ' ') || clean.includes(' ' + qw + ' ') || clean === qw);
+  if (prompt.includes('?') || hasQuestionWord) {
+    return false;
+  }
+
+  // Exact greetings list
+  const exactCasualPhrases = [
+    'hi', 'hello', 'hey', 'namaste', 'good morning', 'good evening', 'good afternoon',
+    'thanks', 'thank you', 'sup', 'yo', 'nice to meet you'
   ];
 
-  const isCasualPhrase = casualPhrases.some(phrase => clean.includes(phrase));
-  const technicalKeywords = ['code', 'build', 'project', 'app', 'system', 'tech', 'react', 'api', 'database', 'security', 'story', 'design', 'market'];
-  const hasTechKeywords = technicalKeywords.some(kw => clean.includes(kw));
-
-  return (isCasualPhrase || clean.length <= 15) && !hasTechKeywords;
+  // Only return true if prompt is an EXACT 1-2 word greeting
+  return exactCasualPhrases.includes(clean);
 }
 
 /**
@@ -45,6 +49,57 @@ function getRandomIndianName(usedNames = []) {
 }
 
 /**
+ * Evaluates whether existing session personas are relevant to a new user prompt.
+ * If the topic shifts significantly (e.g. from React/Tech to Shayari/Poetry or Legal/Medical),
+ * this function returns FALSE, triggering automatic re-allocation of new domain experts!
+ */
+function arePersonasRelevantToPrompt(userPrompt, existingPersonas = []) {
+  if (!existingPersonas || existingPersonas.length === 0) return false;
+  if (!userPrompt || typeof userPrompt !== 'string') return true;
+
+  // Single-persona casual assistant check
+  if (existingPersonas.length === 1 && existingPersonas[0].role?.toLowerCase().includes('friendly assistant')) {
+    // If prompt is no longer casual, existing friendly assistant is NOT relevant
+    return isCasualConversation(userPrompt);
+  }
+
+  // If prompt is a casual greeting, keep existing personas for smooth continuation
+  if (isCasualConversation(userPrompt)) {
+    return true;
+  }
+
+  const promptLower = userPrompt.toLowerCase();
+
+  // Define clear domain categories to detect major topic shifts
+  const domains = [
+    { key: 'tech', words: ['code', 'react', 'javascript', 'node', 'api', 'database', 'sql', 'bug', 'git', 'deploy', 'css', 'html', 'python', 'server', 'docker', 'frontend', 'backend', 'auth', 'system'] },
+    { key: 'creative', words: ['shayari', 'poem', 'poetry', 'story', 'song', 'lyrics', 'script', 'rhyme', 'creative', 'novel', 'kavi', 'gazal'] },
+    { key: 'business', words: ['marketing', 'sales', 'revenue', 'startup', 'business', 'pricing', 'seo', 'growth', 'finance', 'invest'] },
+    { key: 'health', words: ['diet', 'workout', 'exercise', 'health', 'calorie', 'muscle', 'fitness', 'medical', 'doctor'] },
+    { key: 'academic', words: ['history', 'science', 'math', 'physics', 'geography', 'philosophy', 'essay'] }
+  ];
+
+  // Combine roles/mindsets of existing personas to infer current domain
+  const existingText = existingPersonas.map(p => `${p.name} ${p.role} ${p.mindset}`).join(' ').toLowerCase();
+
+  let existingDomain = null;
+  let newPromptDomain = null;
+
+  for (const d of domains) {
+    if (d.words.some(w => existingText.includes(w))) existingDomain = d.key;
+    if (d.words.some(w => promptLower.includes(w))) newPromptDomain = d.key;
+  }
+
+  // If both domains are detected and they mismatch (e.g. tech -> creative), personas are NOT relevant!
+  if (existingDomain && newPromptDomain && existingDomain !== newPromptDomain) {
+    console.log(`🔀 Topic shift detected: ${existingDomain} -> ${newPromptDomain}. Re-allocating personas.`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Step A: Dynamic Persona Allocator Agent (with Session Persona Lock & Intent Routing)
  */
 export async function allocatePersonas(inputParam, existingPersonasParam = [], providerParam = 'gemini') {
@@ -64,9 +119,9 @@ export async function allocatePersonas(inputParam, existingPersonasParam = [], p
     provider = providerParam || 'gemini';
   }
 
-  // 1. CASUAL CONVERSATION BYPASS: Re-use existing persona if available!
+  // 1. CASUAL CONVERSATION BYPASS: Re-use existing persona if available and relevant!
   if (isCasualConversation(userPrompt)) {
-    if (existingPersonas && existingPersonas.length > 0) {
+    if (existingPersonas && existingPersonas.length > 0 && arePersonasRelevantToPrompt(userPrompt, existingPersonas)) {
       return { personas: existingPersonas, count: existingPersonas.length, temperature: 0.7 };
     }
 
@@ -83,9 +138,13 @@ export async function allocatePersonas(inputParam, existingPersonasParam = [], p
     return { personas: casualPersonas, count: 1, temperature: 0.7 };
   }
 
+  // Check topic drift: If existing personas are no longer relevant to the new prompt, reset existingPersonas!
+  const isPersonaRelevant = arePersonasRelevantToPrompt(userPrompt, existingPersonas);
+  const activeExistingPersonas = isPersonaRelevant ? existingPersonas : [];
+
   // 2. DOMAIN / TECHNICAL QUERY: Perform deep domain analysis & allocate specialized expert personas
   const temperature = detectTemperature(userPrompt);
-  const existingNames = existingPersonas.map(p => p.name);
+  const existingNames = activeExistingPersonas.map(p => p.name);
 
   const BEHAVIOR_PROMPT_MAP = {
     no_sugarcoating: "Blunt, direct & unfiltered without polite fluff",

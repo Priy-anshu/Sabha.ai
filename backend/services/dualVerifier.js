@@ -30,11 +30,11 @@ If flaws exist, point out the exact errors and provide the corrected facts.`;
   const completenessAuditorInstruction = `You are Ishaan (Completeness & Clarity Auditor).
 Your job is to audit a proposed AI answer against a user prompt for:
 - Missing user requirements (did it answer ALL parts of the user question?)
-- Clarity, formatting, and ease of understanding
-- Unnecessary fluff or overly long answers
+- Clarity, simple human-friendly vocabulary, and ease of understanding
+- Unnecessary complex jargon or convoluted phrasing
 
 If the answer is completely clean, state "STATUS: APPROVED".
-If missing details exist, list what was missed and how to improve it.`;
+If missing details or complex jargon exist, list what should be simplified or improved.`;
 
   const completenessAuditResult = await callLLM({
     prompt: `User Prompt: "${userPrompt}"\n\nProposed Answer to Audit:\n${debateConsensus}\n\nPerform Completeness & Clarity Audit:`,
@@ -57,9 +57,10 @@ Your job is to take an initial proposed answer and refine it using feedback from
 1. Fact Auditor Feedback: ${factAuditResult}
 2. Completeness Auditor Feedback: ${completenessAuditResult}
 
-FORMATTING RULES:
-1. Preserve markdown bullet points (- ) for all sub-items under headings.
-2. ALWAYS preserve or include the final conclusion section ("### 💡 Key Takeaway & Conclusion") and the 3 follow-up questions ("### ❓ Suggested Follow-Up Questions") at the end.
+FORMATTING & READABILITY RULES:
+1. Write in simple, clear, human-friendly words. Replace overly dense jargon or complex phrasing with plain language.
+2. Preserve markdown bullet points (- ) for all sub-items under headings.
+3. ALWAYS preserve or include the final conclusion section ("### 💡 Key Takeaway & Conclusion") and the 3 follow-up questions ("### ❓ Suggested Follow-Up Questions") at the end.
 Produce a final, polished, error-free answer addressing all feedback. Do NOT include verifier names or meta commentary in your response.`;
 
     finalVerifiedOutput = await callLLM({
