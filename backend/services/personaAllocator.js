@@ -25,13 +25,30 @@ function isCasualConversation(prompt) {
 }
 
 /**
- * Detects if a prompt is creative or technical to scale temperature accordingly.
+ * Checks if a user prompt is purely requesting an AI image generation.
  */
-function detectTemperature(prompt) {
-  if (!prompt || typeof prompt !== 'string') return 0.3;
-  const creativeKeywords = ['story', 'poem', 'script', 'creative', 'brainstorm', 'novel', 'plot', 'character', 'song', 'essay'];
-  const isCreative = creativeKeywords.some(kw => prompt.toLowerCase().includes(kw));
-  return isCreative ? 0.95 : 0.3;
+export function isPureImagePrompt(prompt) {
+  if (!prompt || typeof prompt !== 'string') return false;
+  const lower = prompt.trim().toLowerCase();
+  const pureImageTriggers = [
+    'generate image', 'generate an image', 'create an image', 'create image',
+    'draw a', 'draw an', 'make an image', 'make image', 'render image',
+    'generate a picture', 'create a picture', 'draw picture', 'generate photo', 'create photo'
+  ];
+  return pureImageTriggers.some(t => lower.includes(t));
+}
+
+/**
+ * Checks if a technical/architectural prompt would benefit from an appended visual diagram.
+ */
+export function requiresVisualDiagram(prompt) {
+  if (!prompt || typeof prompt !== 'string') return false;
+  const lower = prompt.trim().toLowerCase();
+  const diagramKeywords = [
+    'architecture', 'diagram', 'flowchart', 'system design', 'microservice',
+    'workflow', 'pipeline', 'schema', 'data flow', 'sequence diagram', 'class diagram'
+  ];
+  return diagramKeywords.some(kw => lower.includes(kw));
 }
 
 /**
@@ -117,6 +134,20 @@ export async function allocatePersonas(inputParam, existingPersonasParam = [], p
     userPrompt = String(inputParam || '');
     existingPersonas = existingPersonasParam || [];
     provider = providerParam || 'gemini';
+  }
+
+  // 0. PURE IMAGE GENERATION BYPASS: Skip debate loop and allocate single Visual Artist persona!
+  if (isPureImagePrompt(userPrompt)) {
+    const artistName = getRandomIndianName();
+    const artistPersona = [
+      {
+        id: 'visual_artist',
+        name: `${artistName} (AI Visual Artist)`,
+        role: 'AI Image Generator & Visual Specialist',
+        mindset: 'Generates high-definition visual imagery directly.'
+      }
+    ];
+    return { personas: artistPersona, count: 1, temperature: 0.7 };
   }
 
   // 1. CASUAL CONVERSATION BYPASS: Re-use existing persona if available and relevant!

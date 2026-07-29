@@ -72,6 +72,94 @@ function ExpandableUserText({ text, msgId, onCopy, isCopied }) {
   );
 }
 
+// Custom Code Block Component with Header Bar & One-Click Copy Code Button
+function CodeBlock({ inline, className, children, ...props }) {
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1].toUpperCase() : 'CODE';
+  const codeContent = String(children).replace(/\n$/, '');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(codeContent);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (inline) {
+    return <code className="inline-code-badge" {...props}>{children}</code>;
+  }
+
+  return (
+    <div className="code-block-wrapper shadow-md">
+      <div className="code-block-header">
+        <span className="code-block-lang">{language}</span>
+        <button className="code-copy-btn" onClick={handleCopyCode} title="Copy code snippet">
+          {copied ? (
+            <>
+              <Check size={14} color="#4ade80" />
+              <span style={{ color: '#4ade80', fontWeight: 600 }}>Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy size={14} />
+              <span>Copy code</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div className="code-block-content">
+        <pre>
+          <code className={className} {...props}>
+            {codeContent}
+          </code>
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+// Custom Markdown Image Card Component for AI Images & Architecture Diagrams
+function ImageBlock({ src, alt }) {
+  const [imgLoading, setImgLoading] = useState(true);
+
+  return (
+    <div className="markdown-image-card">
+      <div className="markdown-image-wrapper">
+        {imgLoading && (
+          <div className="img-skeleton-loader">
+            <Sparkles size={20} className="spin-icon text-sky-400" />
+            <span>Rendering AI Image...</span>
+          </div>
+        )}
+        <img
+          src={src}
+          alt={alt || 'AI Image'}
+          onLoad={() => setImgLoading(false)}
+          className={`markdown-rendered-img ${imgLoading ? 'hidden-img' : ''}`}
+        />
+      </div>
+      <div className="markdown-img-footer">
+        <span className="img-caption">{alt || 'Generated AI Image'}</span>
+        <a
+          href={src}
+          target="_blank"
+          rel="noopener noreferrer"
+          download="sabha_ai_image.png"
+          className="img-download-link"
+        >
+          <span>Download Image</span>
+        </a>
+      </div>
+    </div>
+  );
+}
+
+const markdownComponents = {
+  code: CodeBlock,
+  img: ImageBlock
+};
+
 // Streaming Markdown component for smooth word-by-word/line-by-line ChatGPT response animation
 function StreamingMarkdown({ text, isLatest }) {
   const [displayedText, setDisplayedText] = useState(isLatest ? '' : text);
@@ -102,7 +190,7 @@ function StreamingMarkdown({ text, isLatest }) {
     return () => clearInterval(interval);
   }, [text, isLatest]);
 
-  return <ReactMarkdown>{displayedText}</ReactMarkdown>;
+  return <ReactMarkdown components={markdownComponents}>{displayedText}</ReactMarkdown>;
 }
 
 export default function ChatMessages({
@@ -311,7 +399,7 @@ export default function ChatMessages({
                     </div>
                   ) : (
                     <div className="message-content markdown-body">
-                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      <ReactMarkdown components={markdownComponents}>{msg.text}</ReactMarkdown>
                     </div>
                   )}
                 </div>

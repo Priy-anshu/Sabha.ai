@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import { callLLM } from './services/llmProvider.js';
-import { allocatePersonas } from './services/personaAllocator.js';
+import { allocatePersonas, isPureImagePrompt, requiresVisualDiagram } from './services/personaAllocator.js';
 import { runDebate } from './services/debateEngine.js';
 import { runDualVerification } from './services/dualVerifier.js';
 import { extractTextFromFile, chunkText, retrieveRelevantContext, generateEmbeddingsForChunks } from './services/ragService.js';
@@ -139,31 +139,58 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
       status: 'completed'
     });
 
-    const debateResult = await runDebate({
-      userPrompt: finalPrompt,
-      personas,
-      provider,
-      documentContext,
-      behaviors,
-      chatMemoryPrompt,
-      onProgress: (event) => {
-        sendEvent('debate_step', event);
-      }
-    });
+    let verificationResult = { verified: true, verifiers: [], finalResponse: '' };
+    let debateResult = { consensus: '', transcript: [] };
 
-    sendEvent('status', {
-      title: 'Running Dual-Persona Quality Audit',
-      detail: 'Fact Auditor (Kavya) & Completeness Auditor (Ishaan) auditing consensus output...',
-      status: 'in_progress'
-    });
-
-    let verificationResult = { verified: true, verifiers: [], finalResponse: debateResult.consensus };
-    if (personas.length > 1) {
-      verificationResult = await runDualVerification({
-        userPrompt: finalPrompt,
-        debateConsensus: debateResult.consensus,
-        provider
+    // Mode A: Pure Image Generation (No Debate)
+    if (isPureImagePrompt(finalPrompt)) {
+      sendEvent('status', {
+        title: '🎨 Generating AI Image',
+        detail: 'Rendering high-definition visual imagery using Flux AI model...',
+        status: 'in_progress'
       });
+
+      const cleanImagePrompt = finalPrompt.replace(/^(generate|create|draw|make)\s+(an?\s+)?(image|picture|drawing|illustration|photo)\s+(of\s+)?/i, '').trim() || finalPrompt;
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanImagePrompt)}?width=1024&height=1024&nologo=true&seed=${Date.now()}`;
+      const imageResponse = `Here is your generated image for **"${cleanImagePrompt}"**:\n\n![${cleanImagePrompt}](${imageUrl})`;
+
+      verificationResult = { verified: true, verifiers: [], finalResponse: imageResponse };
+      debateResult = { consensus: imageResponse, transcript: [{ personaName: personas[0]?.name || 'AI Visual Artist', role: 'AI Image Generator', output: imageResponse }] };
+    } else {
+      // Mode B & C: Multi-Agent Consensus Debate
+      debateResult = await runDebate({
+        userPrompt: finalPrompt,
+        personas,
+        provider,
+        documentContext,
+        behaviors,
+        chatMemoryPrompt,
+        onProgress: (event) => {
+          sendEvent('debate_step', event);
+        }
+      });
+
+      sendEvent('status', {
+        title: 'Running Dual-Persona Quality Audit',
+        detail: 'Fact Auditor (Kavya) & Completeness Auditor (Ishaan) auditing consensus output...',
+        status: 'in_progress'
+      });
+
+      verificationResult = { verified: true, verifiers: [], finalResponse: debateResult.consensus };
+      if (personas.length > 1) {
+        verificationResult = await runDualVerification({
+          userPrompt: finalPrompt,
+          debateConsensus: debateResult.consensus,
+          provider
+        });
+      }
+
+      // Appends Architecture/Flowchart Diagram if helpful for complex prompt
+      if (!verificationResult.finalResponse.includes('![') && requiresVisualDiagram(finalPrompt)) {
+        const diagramTopic = finalPrompt.replace(/[^a-zA-Z0-9\s]/g, '').trim().slice(0, 80);
+        const diagramUrl = `https://image.pollinations.ai/prompt/high_resolution_clean_technical_architecture_diagram_of_${encodeURIComponent(diagramTopic)}?width=1024&height=512&nologo=true&seed=${Date.now()}`;
+        verificationResult.finalResponse += `\n\n### 📐 Visual Architecture Diagram\n\n![Technical Architecture Diagram](${diagramUrl})`;
+      }
     }
 
     sendEvent('status', {
