@@ -48,22 +48,45 @@ export default function ChatInput({
     }
   };
 
+  const getFileExtension = (filename) => {
+    if (!filename) return 'DOC';
+    const parts = filename.split('.');
+    if (parts.length <= 1) return 'DOC';
+    const ext = parts.pop().toUpperCase();
+    return ext.length <= 4 ? ext : 'DOC';
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
-    <>
-      {/* File Attachment Chip */}
+    <div className="input-area">
+      {/* File Attachment Chip Card inside Input Box */}
       {attachedFile && (
-        <div style={{ padding: '0 1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8', padding: '0.3rem 0.6rem', borderRadius: '8px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <FileText size={14} />
-            <span>{attachedFile.name}</span>
-            <button onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-              <X size={14} />
-            </button>
+        <div className="attached-file-card">
+          <div className="attached-file-icon-wrapper">
+            <FileText size={16} color="#38bdf8" />
+            <span className="file-ext-badge">{getFileExtension(attachedFile.name)}</span>
           </div>
+          <div className="attached-file-info">
+            <span className="attached-file-name" title={attachedFile.name}>{attachedFile.name}</span>
+            {attachedFile.size && <span className="attached-file-size">{formatFileSize(attachedFile.size)}</span>}
+          </div>
+          <button
+            className="remove-file-btn"
+            onClick={() => setAttachedFile(null)}
+            title="Remove attachment"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      <div className="input-area">
+      <div className="input-row">
         <input
           type="file"
           ref={fileInputRef}
@@ -115,6 +138,6 @@ export default function ChatInput({
           </button>
         )}
       </div>
-    </>
+    </div>
   );
 }

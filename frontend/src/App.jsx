@@ -49,8 +49,8 @@ export default function App() {
     localStorage.setItem('selectedBehaviors', JSON.stringify(newBehaviors));
   };
 
-  // Collapsible Sidebar State (defaults to true for logged-in users)
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Collapsible Sidebar State (defaults to true for desktop, false for mobile)
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
 
   // Theme State
   const [theme, setTheme] = useState(() => {
@@ -85,6 +85,19 @@ export default function App() {
   };
 
   useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 768) {
+        setSidebarOpen(false);
+      }
+    };
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
     if (!user) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -101,7 +114,11 @@ export default function App() {
       setSidebarOpen(false);
     } else {
       fetchSessionsList();
-      setSidebarOpen(true);
+      if (window.innerWidth > 768) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
     }
   }, [user, token]);
 
@@ -121,11 +138,17 @@ export default function App() {
     setHasMoreMessages(false);
     setMessageOffset(0);
     setUserHasScrolledUp(false);
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
   };
 
   const handleSelectSession = async (sId) => {
     if (loading && abortControllerRef.current) {
       abortControllerRef.current.abort();
+    }
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
     }
     // Instant 0ms UI Feedback: Immediately highlight session and display Skeleton Loader
     setSessionId(sId);
@@ -338,17 +361,25 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar Component (Only rendered for logged-in users when sidebarOpen is true) */}
-      {user && sidebarOpen && (
-        <Sidebar
-          sessions={sessions}
-          sessionId={sessionId}
-          onToggleSidebar={handleToggleSidebar}
-          onNewChat={handleNewChat}
-          onSelectSession={handleSelectSession}
-          onDeleteSession={handleDeleteSession}
-          onOpenAuthModal={() => setShowAuthModal(true)}
-        />
+      {/* Sidebar Component with Mobile Backdrop Overlay */}
+      {user && (
+        <>
+          {sidebarOpen && (
+            <div className="mobile-sidebar-backdrop" onClick={handleToggleSidebar} />
+          )}
+          {sidebarOpen && (
+            <Sidebar
+              sessions={sessions}
+              sessionId={sessionId}
+              sidebarOpen={sidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onNewChat={handleNewChat}
+              onSelectSession={handleSelectSession}
+              onDeleteSession={handleDeleteSession}
+              onOpenAuthModal={() => setShowAuthModal(true)}
+            />
+          )}
+        </>
       )}
 
       {/* Main Chat Content Area */}

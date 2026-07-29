@@ -374,13 +374,34 @@ body {
 
 /* Centered Input Layout for New Chat */
 .new-chat-mode .input-wrapper-container {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  right: auto;
   max-width: 800px;
   width: 90%;
   margin: 0 auto 3rem auto;
+  background: transparent;
+  pointer-events: auto;
 }
 
 .input-wrapper-container {
-  width: 100%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(180deg, rgba(11, 15, 25, 0) 0%, var(--bg-main) 40%);
+  pointer-events: none;
+}
+
+[data-theme="light"] .input-wrapper-container {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0) 0%, var(--bg-main) 40%);
+}
+
+.input-wrapper-container > * {
+  pointer-events: auto;
 }
 
 /* Messages Feed Wrapper (Scrollbar at Rightmost Edge) */
@@ -389,6 +410,7 @@ body {
   width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-bottom: 110px;
 }
 
 .messages-feed-wrapper::-webkit-scrollbar {
@@ -620,7 +642,7 @@ body {
   font-style: italic;
 }
 
-/* Input Bar */
+/* Input Bar & Attached File Card */
 .input-area {
   margin: 0 auto 1.5rem auto;
   max-width: 850px;
@@ -628,12 +650,92 @@ body {
   background: var(--input-bg);
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  padding: 0.4rem 0.6rem;
+  padding: 0.5rem 0.75rem;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   box-shadow: 0 8px 24px var(--card-shadow);
   transition: border-color 0.2s ease, background-color 0.25s ease;
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.attached-file-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(129, 140, 248, 0.08));
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  max-width: 320px;
+  align-self: flex-start;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.attached-file-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+.file-ext-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #38bdf8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.attached-file-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-width: 200px;
+}
+
+.attached-file-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attached-file-size {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.remove-file-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+  margin-left: 4px;
+}
+
+.remove-file-btn:hover {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.15);
+  transform: scale(1.1);
 }
 
 .input-area:focus-within {
@@ -1396,6 +1498,184 @@ body {
   color: #0f172a;
   box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
   transform: translateX(-50%) translateY(-2px);
+}
+
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVE STYLES (≤ 768px)
+   Keeps Desktop view (> 768px) completely untouched.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+    width: 100vw;
+    height: 100%;
+  }
+
+  .app-container {
+    width: 100vw;
+    height: 100vh;
+    height: -webkit-fill-available;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Mobile Backdrop Overlay for Drawer */
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* Mobile Sidebar as Slide-out Drawer */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 1000;
+    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.5);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  /* Sticky Fixed Header on Mobile so it never vanishes on scroll */
+  .chat-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+    background-color: var(--bg-main) !important;
+    backdrop-filter: blur(8px) !important;
+    padding: 0.6rem 0.8rem !important;
+    gap: 8px !important;
+    height: 56px !important;
+    border-bottom: 1px solid var(--border-color) !important;
+  }
+
+  .chat-header-tagline {
+    display: none !important;
+  }
+
+  .chat-title {
+    font-size: 1.05rem !important;
+  }
+
+  .sign-in-sidebar-btn {
+    padding: 0.35rem 0.6rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  /* Main Chat Area & Messages Feed */
+  .main-chat-area {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    flex: 1 !important;
+    overflow-x: hidden !important;
+  }
+
+  .messages-feed-wrapper {
+    padding-bottom: 1rem !important;
+  }
+
+  /* Mobile Grid Stacking for Persona Thinking Cards */
+  .thinking-grid, .personas-grid, .live-steps-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .live-thinking-card {
+    padding: 0.85rem !important;
+  }
+
+  .persona-card-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Markdown Code & Message Bubbles */
+  .message-bubble, .agent-message-content {
+    max-width: 100% !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .message-bubble pre, pre {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    font-size: 0.8rem !important;
+    padding: 0.6rem !important;
+  }
+
+  .messages-feed-wrapper {
+    padding-bottom: 95px !important;
+  }
+
+  /* Chat Input Box Mobile Positioning - Prevents Cutting Off & Stays Fixed */
+  .input-wrapper-container {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0.4rem 0.5rem 0.6rem 0.5rem !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    z-index: 90 !important;
+  }
+
+  .new-chat-mode .input-wrapper-container {
+    position: relative !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 95% !important;
+    margin: 0 auto 1.5rem auto !important;
+  }
+
+  .input-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto 0.5rem auto !important;
+    padding: 0.35rem 0.5rem !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
+    border-radius: 12px !important;
+  }
+
+  .chat-input {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 0.9rem !important;
+    padding: 0.4rem 0.2rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .attach-btn, .send-btn {
+    padding: 0.35rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Modals Mobile Sizing */
+  .auth-modal-content, .inspection-modal-content {
+    width: 92vw !important;
+    max-width: 440px !important;
+    padding: 1.25rem 1rem !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+  }
 }
 
 

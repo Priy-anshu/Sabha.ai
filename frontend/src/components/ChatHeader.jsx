@@ -17,19 +17,20 @@ export default function ChatHeader({
   return (
     <div className="chat-header">
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Toggle Sidebar Button for Logged-In User when collapsed */}
-        {user && !sidebarOpen && (
+        <Bot size={24} color="#38bdf8" />
+
+        <span className="chat-title" style={{ fontSize: '1.15rem', fontWeight: 800 }}>
+          Sabha<span style={{ color: '#818cf8' }}>.ai</span>
+        </span>
+
+        {/* Toggle Sidebar Button placed right after Sabha.ai */}
+        {user && (!sidebarOpen || window.innerWidth <= 768) && (
           <button className="expand-sidebar-btn" onClick={onToggleSidebar} title="Open Sidebar">
             <PanelLeftOpen size={20} />
           </button>
         )}
 
-        {(!user || !sidebarOpen) && <Bot size={24} color="#38bdf8" />}
-
-        <span className="chat-title" style={{ fontSize: '1.15rem', fontWeight: 800 }}>
-          Sabha<span style={{ color: '#818cf8' }}>.ai</span>
-        </span>
-        <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>| Multi-Agent Consensus Platform</span>
+        <span className="chat-header-tagline" style={{ fontSize: '0.8rem', opacity: 0.6 }}>| Multi-Agent Consensus Platform</span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

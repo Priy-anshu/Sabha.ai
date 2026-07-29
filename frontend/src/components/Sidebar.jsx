@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 export default function Sidebar({
   sessions,
   sessionId,
+  sidebarOpen,
   onToggleSidebar,
   onNewChat,
   onSelectSession,
@@ -20,7 +21,7 @@ export default function Sidebar({
   };
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${sidebarOpen ? 'mobile-open' : ''}`}>
       {/* Brand Header with Collapse Sidebar Button */}
       <div className="sidebar-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
