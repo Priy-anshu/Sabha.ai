@@ -1,11 +1,15 @@
 import { fetchWithAuth } from './apiConfig.js';
 
-export async function sendDebatePrompt({ prompt, file, existingPersonas, behaviors, sessionId, signal }) {
+export async function sendDebatePrompt({ prompt, file, files, existingPersonas, behaviors, sessionId, signal }) {
   const formData = new FormData();
   formData.append('prompt', prompt || '');
 
   if (sessionId) formData.append('sessionId', sessionId);
-  if (file) formData.append('file', file);
+  if (files && Array.isArray(files) && files.length > 0) {
+    files.forEach(f => formData.append('files', f));
+  } else if (file) {
+    formData.append('file', file);
+  }
   if (existingPersonas && existingPersonas.length > 0) formData.append('existingPersonas', JSON.stringify(existingPersonas));
   if (behaviors && behaviors.length > 0) formData.append('behaviors', JSON.stringify(behaviors));
 
@@ -18,7 +22,7 @@ export async function sendDebatePrompt({ prompt, file, existingPersonas, behavio
   return res.json();
 }
 
-export async function sendDebatePromptStream({ prompt, file, existingPersonas, behaviors, sessionId, signal, onEvent }) {
+export async function sendDebatePromptStream({ prompt, file, files, existingPersonas, behaviors, sessionId, signal, onEvent }) {
   const formData = new FormData();
   formData.append('prompt', prompt || '');
 
@@ -26,7 +30,9 @@ export async function sendDebatePromptStream({ prompt, file, existingPersonas, b
     formData.append('sessionId', sessionId);
   }
 
-  if (file) {
+  if (files && Array.isArray(files) && files.length > 0) {
+    files.forEach(f => formData.append('files', f));
+  } else if (file) {
     formData.append('file', file);
   }
 

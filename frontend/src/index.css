@@ -1679,15 +1679,16 @@ body {
 }
 
 /* =====================================================================
-   CODE BLOCK WRAPPER & ONE-CLICK COPY CONTAINER
+   CODE BLOCK WRAPPER & ONE-CLICK COPY CONTAINER (THEME-AWARE)
    ===================================================================== */
 .code-block-wrapper {
   margin: 1rem 0;
   border-radius: 10px;
   overflow: hidden;
-  background: #090d16;
-  border: 1px solid rgba(56, 189, 248, 0.2);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  background: #030712;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(56, 189, 248, 0.1);
+  transition: all 0.25s ease;
 }
 
 .code-block-header {
@@ -1695,13 +1696,13 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0.45rem 1rem;
-  background: #111827;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f172a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .code-block-lang {
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.8px;
   color: #38bdf8;
   text-transform: uppercase;
@@ -1711,21 +1712,21 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
   border-radius: 6px;
-  padding: 0.25rem 0.55rem;
+  padding: 0.25rem 0.6rem;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .code-copy-btn:hover {
-  background: rgba(56, 189, 248, 0.15);
+  background: rgba(56, 189, 248, 0.2);
   color: #ffffff;
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: rgba(56, 189, 248, 0.5);
 }
 
 .code-block-content {
@@ -1734,13 +1735,46 @@ body {
   font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
   font-size: 0.88rem;
   line-height: 1.6;
-  color: #e2e8f0;
+  color: #f1f5f9;
 }
 
 .code-block-content pre {
   margin: 0;
   padding: 0;
   background: transparent;
+}
+
+/* Light Theme Code Block Customizations: White BG, Black Border, Black Text */
+[data-theme="light"] .code-block-wrapper {
+  background: #ffffff !important;
+  border: 2px solid #000000 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .code-block-header {
+  background: #f1f5f9 !important;
+  border-bottom: 2px solid #000000 !important;
+}
+
+[data-theme="light"] .code-block-lang {
+  color: #0284c7 !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] .code-copy-btn {
+  background: #ffffff !important;
+  border: 1px solid #000000 !important;
+  color: #000000 !important;
+}
+
+[data-theme="light"] .code-copy-btn:hover {
+  background: #e2e8f0 !important;
+  color: #000000 !important;
+}
+
+[data-theme="light"] .code-block-content {
+  color: #000000 !important;
+  font-weight: 500 !important;
 }
 
 /* Inline Code Badges */
@@ -1752,6 +1786,13 @@ body {
   font-family: monospace;
   font-size: 0.85em;
   border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+[data-theme="light"] .inline-code-badge {
+  background: #f1f5f9 !important;
+  color: #000000 !important;
+  border: 1px solid #000000 !important;
+  font-weight: 600 !important;
 }
 
 /* Markdown Image Cards */
@@ -1833,6 +1874,109 @@ body {
 .img-download-link:hover {
   background: #38bdf8;
   color: #0f172a;
+}
+
+/* =====================================================================
+   HORIZONTAL SCROLL CONTAINER FOR MULTI-FILE ATTACHMENT CHIPS
+   ===================================================================== */
+.attached-files-scroll-container,
+.user-attached-files-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0.25rem 0.2rem 0.5rem 0.2rem;
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.3) transparent;
+}
+
+.attached-files-scroll-container::-webkit-scrollbar,
+.user-attached-files-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.attached-files-scroll-container::-webkit-scrollbar-thumb,
+.user-attached-files-scroll::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 4px;
+}
+
+.attached-file-card,
+.user-attached-file-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+  max-width: 220px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+[data-theme="light"] .attached-file-card,
+[data-theme="light"] .user-attached-file-chip {
+  background: #f1f5f9;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.attached-file-icon-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.file-ext-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 1px 4px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.attached-file-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.attached-file-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.attached-file-size {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.remove-file-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.remove-file-btn:hover {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.15);
 }
 
 

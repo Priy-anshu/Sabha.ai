@@ -53,7 +53,7 @@ app.post('/api/chat/allocate-personas', async (req, res) => {
 });
 
 // POST /api/chat/debate-stream - Real-Time SSE Multi-Agent Thinking Stream
-app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, res) => {
+app.post('/api/chat/debate-stream', protect, upload.any(), async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -85,8 +85,9 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
     const behaviors = req.body.behaviors ? JSON.parse(req.body.behaviors) : [];
     const sessionId = req.body.sessionId || 'sess_default';
     const isGuestUser = !req.user || req.user.userId === 'guest_user_101';
+    const uploadedFiles = req.files || (req.file ? [req.file] : []);
 
-    if (req.file && isGuestUser) {
+    if (uploadedFiles.length > 0 && isGuestUser) {
       sendEvent('error', { error: 'Document upload requires a signed-in account.' });
       return res.end();
     }
@@ -100,15 +101,23 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
       status: 'in_progress'
     });
 
-    if (req.file && !isGuestUser) {
-      attachedFileName = req.file.originalname;
-      const rawText = await extractTextFromFile(req.file);
-      const chunks = chunkText(rawText);
-      const embeddings = await generateEmbeddingsForChunks(chunks);
+    if (uploadedFiles.length > 0 && !isGuestUser) {
+      const fileNames = uploadedFiles.map(f => f.originalname);
+      attachedFileName = fileNames.join(', ');
 
-      const docId = 'doc_' + Date.now();
-      await ChatDocs.create({ docId, sessionId, fileName: attachedFileName, mimeType: req.file.mimetype, rawText, chunks, embeddings });
-      documentContext = await retrieveRelevantContext(chunks, prompt || 'Summary', rawText, embeddings);
+      const contextParts = [];
+      for (const file of uploadedFiles) {
+        const rawText = await extractTextFromFile(file);
+        if (rawText) {
+          const chunks = chunkText(rawText);
+          const embeddings = await generateEmbeddingsForChunks(chunks);
+          const docId = 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+          await ChatDocs.create({ docId, sessionId, fileName: file.originalname, mimeType: file.mimetype, rawText, chunks, embeddings });
+          const ctx = await retrieveRelevantContext(chunks, prompt || 'Summary', rawText, embeddings);
+          contextParts.push(`--- Attached File (${file.originalname}) ---\n${ctx}`);
+        }
+      }
+      documentContext = contextParts.join('\n\n');
     } else if (sessionId && !isGuestUser) {
       const existingDocs = await ChatDocs.find({ sessionId }).sort({ uploadedAt: -1 });
       if (existingDocs && existingDocs.length > 0) {
@@ -184,13 +193,6 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
           provider
         });
       }
-
-      // Appends Architecture/Flowchart Diagram if helpful for complex prompt
-      if (!verificationResult.finalResponse.includes('![') && requiresVisualDiagram(finalPrompt)) {
-        const diagramTopic = finalPrompt.replace(/[^a-zA-Z0-9\s]/g, '').trim().slice(0, 80);
-        const diagramUrl = `https://image.pollinations.ai/prompt/high_resolution_clean_technical_architecture_diagram_of_${encodeURIComponent(diagramTopic)}?width=1024&height=512&nologo=true&seed=${Date.now()}`;
-        verificationResult.finalResponse += `\n\n### 📐 Visual Architecture Diagram\n\n![Technical Architecture Diagram](${diagramUrl})`;
-      }
     }
 
     sendEvent('status', {
@@ -225,7 +227,7 @@ app.post('/api/chat/debate-stream', protect, upload.single('file'), async (req, 
 });
 
 // POST /api/chat/debate - Full Pipeline with Auth Protection for File Attachments
-app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) => {
+app.post('/api/chat/debate', protect, upload.any(), async (req, res) => {
   try {
     const prompt = (req.body.prompt || '').trim();
     const provider = req.body.provider || 'gemini';
@@ -233,42 +235,41 @@ app.post('/api/chat/debate', protect, upload.single('file'), async (req, res) =>
     const behaviors = req.body.behaviors ? JSON.parse(req.body.behaviors) : [];
     const sessionId = req.body.sessionId || 'sess_default';
     const isGuestUser = !req.user || req.user.userId === 'guest_user_101';
+    const uploadedFiles = req.files || (req.file ? [req.file] : []);
 
     // ENFORCE AUTH FOR FILE ATTACHMENTS: Guests can only send text prompts
-    if (req.file && isGuestUser) {
+    if (uploadedFiles.length > 0 && isGuestUser) {
       return res.status(401).json({
         success: false,
         error: 'Document upload requires a signed-in account. Please Sign In or Register to upload files.'
       });
     }
 
-    if (!prompt && !req.file) {
+    if (!prompt && uploadedFiles.length === 0) {
       return res.status(400).json({ success: false, error: 'Prompt or document file is required' });
     }
 
     let documentContext = '';
     let attachedFileName = '';
 
-    // Step RAG 1: If user is logged in & attached a file
-    if (req.file && !isGuestUser) {
-      attachedFileName = req.file.originalname;
-      const rawText = await extractTextFromFile(req.file);
-      const chunks = chunkText(rawText);
-      const embeddings = await generateEmbeddingsForChunks(chunks);
+    // Step RAG 1: If user is logged in & attached files
+    if (uploadedFiles.length > 0 && !isGuestUser) {
+      const fileNames = uploadedFiles.map(f => f.originalname);
+      attachedFileName = fileNames.join(', ');
 
-      // Save document into ChatDocs model
-      const docId = 'doc_' + Date.now();
-      await ChatDocs.create({
-        docId,
-        sessionId,
-        fileName: attachedFileName,
-        mimeType: req.file.mimetype,
-        rawText,
-        chunks,
-        embeddings
-      });
-
-      documentContext = await retrieveRelevantContext(chunks, prompt || 'Summary', rawText, embeddings);
+      const contextParts = [];
+      for (const file of uploadedFiles) {
+        const rawText = await extractTextFromFile(file);
+        if (rawText) {
+          const chunks = chunkText(rawText);
+          const embeddings = await generateEmbeddingsForChunks(chunks);
+          const docId = 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+          await ChatDocs.create({ docId, sessionId, fileName: file.originalname, mimeType: file.mimetype, rawText, chunks, embeddings });
+          const ctx = await retrieveRelevantContext(chunks, prompt || 'Summary', rawText, embeddings);
+          contextParts.push(`--- Attached File (${file.originalname}) ---\n${ctx}`);
+        }
+      }
+      documentContext = contextParts.join('\n\n');
     } else if (sessionId && !isGuestUser) {
       // Step RAG 2: Check ChatDocs memory for logged-in user
       const existingDocs = await ChatDocs.find({ sessionId }).sort({ uploadedAt: -1 });

@@ -52,6 +52,16 @@ export function requiresVisualDiagram(prompt) {
 }
 
 /**
+ * Detects if a prompt is creative or technical to scale temperature accordingly.
+ */
+function detectTemperature(prompt) {
+  if (!prompt || typeof prompt !== 'string') return 0.3;
+  const creativeKeywords = ['story', 'poem', 'script', 'creative', 'brainstorm', 'novel', 'plot', 'character', 'song', 'essay', 'shayari'];
+  const isCreative = creativeKeywords.some(kw => prompt.toLowerCase().includes(kw));
+  return isCreative ? 0.95 : 0.3;
+}
+
+/**
  * Pool of diverse, easily pronounceable Indian names.
  */
 const INDIAN_NAMES_POOL = [

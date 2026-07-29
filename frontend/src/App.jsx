@@ -19,7 +19,7 @@ export default function App() {
   const [liveSteps, setLiveSteps] = useState([]);
   const [activePersona, setActivePersona] = useState(null);
   const [input, setInput] = useState('');
-  const [attachedFile, setAttachedFile] = useState(null);
+  const [attachedFiles, setAttachedFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
@@ -232,20 +232,23 @@ export default function App() {
 
   const handleSend = async (customPrompt) => {
     const promptToSend = customPrompt || input;
-    if ((!promptToSend.trim() && !attachedFile) || loading) return;
+    if ((!promptToSend.trim() && attachedFiles.length === 0) || loading) return;
 
-    const userText = attachedFile
-      ? `📎 [Attached: ${attachedFile.name}] ${promptToSend}`
-      : promptToSend;
-
-    const userMsg = { id: String(Date.now()), sender: 'user', text: userText };
+    const attachmentNames = attachedFiles.map(f => f.name);
+    const userMsg = {
+      id: String(Date.now()),
+      sender: 'user',
+      text: promptToSend,
+      attachmentName: attachmentNames.join(', '),
+      attachmentNames
+    };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
 
     const currentInput = promptToSend;
-    const currentFile = attachedFile;
+    const currentFiles = [...attachedFiles];
     setInput('');
-    setAttachedFile(null);
+    setAttachedFiles([]);
     setLiveSteps([]);
     setActivePersona(null);
     setLoading(true);
@@ -258,7 +261,8 @@ export default function App() {
 
       await sendDebatePromptStream({
         prompt: currentInput,
-        file: currentFile,
+        file: currentFiles[0] || null,
+        files: currentFiles,
         existingPersonas: activePersonas,
         behaviors: selectedBehaviors,
         sessionId,
@@ -431,8 +435,8 @@ export default function App() {
           <ChatInput
             input={input}
             setInput={setInput}
-            attachedFile={attachedFile}
-            setAttachedFile={setAttachedFile}
+            attachedFiles={attachedFiles}
+            setAttachedFiles={setAttachedFiles}
             loading={loading}
             onSend={() => handleSend()}
             onStop={handleStop}

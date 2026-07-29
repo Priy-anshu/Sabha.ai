@@ -23,11 +23,12 @@ const BEHAVIOR_PROMPT_MAP = {
 
 const HUMAN_READABLE_DIRECTIVE = `
 
-LANGUAGE & READABILITY RULES:
+LANGUAGE, READABILITY & DIAGRAM RULES:
 - Write in clear, natural, human-friendly language using simple and easy-to-read words.
 - Avoid unnecessarily complex jargon, dense corporate buzzwords, or convoluted phrasing.
 - Explain technical ideas simply and directly as if talking to a smart friend.
-- Keep sentences concise, direct, and easy to follow. Use complex terms ONLY if strictly necessary for technical accuracy.`;
+- Keep sentences concise, direct, and easy to follow.
+- DIAGRAM RULE: When explaining technical architectures, workflows, system pipelines, or step-by-step processes, ALWAYS include a clean, beautifully formatted Markdown ASCII Flowchart Diagram (using boxes like [Frontend] ➔ [Backend] ➔ [Database]) to make the explanation visually intuitive and easy to understand!`;
 
 function buildBehaviorPrompt(behaviors = []) {
   if (!behaviors || !Array.isArray(behaviors) || behaviors.length === 0) return '';

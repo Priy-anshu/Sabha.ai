@@ -27,47 +27,85 @@ function ChatSkeletonLoader() {
   );
 }
 
-// Component for rendering user prompt text with Copy button & "Show More / Show Less" after 3 lines
-function ExpandableUserText({ text, msgId, onCopy, isCopied }) {
-  const [expanded, setExpanded] = useState(false);
-  const safeText = typeof text === 'string' ? text : String(text || '');
-  const isLongText = safeText.length > 180 || safeText.split('\n').length > 3;
+const getFileExtension = (filename) => {
+  if (!filename) return 'DOC';
+  const parts = filename.split('.');
+  if (parts.length <= 1) return 'DOC';
+  const ext = parts.pop().toUpperCase();
+  return ext.length <= 4 ? ext : 'DOC';
+};
 
+// Component for rendering user prompt text with Attachment Chips, Copy button & Expand/Collapse
+function ExpandableUserText({ text, attachmentName: propAttachmentName, msgId, onCopy, isCopied }) {
+  const [expanded, setExpanded] = useState(false);
+  let safeText = typeof text === 'string' ? text : String(text || '');
+  let attachmentName = propAttachmentName || '';
+
+  // Extract legacy raw attachment string if present
+  if (!attachmentName && safeText.includes('📎 [Attached: ')) {
+    const match = safeText.match(/📎 \[Attached:\s*([^\]]+)\]/);
+    if (match) {
+      attachmentName = match[1];
+      safeText = safeText.replace(/📎 \[Attached:\s*[^\]]+\]\s*/, '').trim();
+    }
+  }
+
+  // Parse multiple attachment names if comma-separated
+  const fileNamesList = attachmentName
+    ? attachmentName.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  const isLongText = safeText.length > 180 || safeText.split('\n').length > 3;
   const truncatedText = isLongText ? safeText.slice(0, 180) + '...' : safeText;
 
   return (
     <div className="user-message-body" style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-        <div className="message-content" style={{ flex: 1 }}>
-          <span>{expanded || !isLongText ? safeText : truncatedText}</span>
-          {isLongText && (
-            <button
-              className="expand-text-btn"
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? (
-                <>
-                  <span>Show Less</span> <ChevronUp size={13} />
-                </>
-              ) : (
-                <>
-                  <span>Show More</span> <ChevronDown size={13} />
-                </>
-              )}
-            </button>
-          )}
+      {/* Multiple File Attachment Chips inside User Bubble with Horizontal Scroll */}
+      {fileNamesList.length > 0 && (
+        <div className="user-attached-files-scroll">
+          {fileNamesList.map((fName, idx) => (
+            <div key={idx} className="user-attached-file-chip">
+              <FileText size={15} color="#38bdf8" />
+              <span className="file-ext-badge">{getFileExtension(fName)}</span>
+              <span className="attached-file-name">{fName}</span>
+            </div>
+          ))}
         </div>
+      )}
 
-        {/* User Prompt Copy Button */}
-        <button
-          className="copy-btn user-copy-btn"
-          onClick={() => onCopy(msgId, safeText)}
-          title="Copy prompt"
-          style={{ opacity: 0.8, color: 'rgba(255, 255, 255, 0.85)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px' }}
-        >
-          {isCopied ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
-        </button>
-      </div>
+      {safeText && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginTop: attachmentName ? '0.4rem' : 0 }}>
+          <div className="message-content" style={{ flex: 1 }}>
+            <span>{expanded || !isLongText ? safeText : truncatedText}</span>
+            {isLongText && (
+              <button
+                className="expand-text-btn"
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? (
+                  <>
+                    <span>Show Less</span> <ChevronUp size={13} />
+                  </>
+                ) : (
+                  <>
+                    <span>Show More</span> <ChevronDown size={13} />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* User Prompt Copy Button */}
+          <button
+            className="copy-btn user-copy-btn"
+            onClick={() => onCopy(msgId, safeText)}
+            title="Copy prompt"
+            style={{ opacity: 0.8, color: 'rgba(255, 255, 255, 0.85)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px' }}
+          >
+            {isCopied ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -389,6 +427,7 @@ export default function ChatMessages({
                   {msg.sender === 'user' ? (
                     <ExpandableUserText
                       text={msg.text}
+                      attachmentName={msg.attachmentName}
                       msgId={msg.id}
                       onCopy={handleCopy}
                       isCopied={copiedId === msg.id}
