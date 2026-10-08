@@ -132,7 +132,7 @@ export default function App() {
     setActivePersonas([]);
     setLiveSteps([]);
     setActivePersona(null);
-    setAttachedFile(null);
+    setAttachedFiles(null);
     setLoading(false);
     setIsSessionLoading(false);
     setHasMoreMessages(false);
