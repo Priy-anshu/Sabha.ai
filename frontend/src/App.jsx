@@ -105,7 +105,7 @@ export default function App() {
       setSessions([]);
       setMessages([]);
       setActivePersonas([]);
-      setAttachedFile(null);
+      setAttachedFiles(null);
       setInput('');
       setSelectedBehaviors([]);
       setModalData(null);
