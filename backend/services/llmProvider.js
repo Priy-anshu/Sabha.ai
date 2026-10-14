@@ -81,8 +81,52 @@ async function callGeminiDirect({ prompt, systemInstruction, temperature }) {
   throw lastError;
 }
 
+// In-memory cache for Groq active models to prevent breaking on model deprecation
+let cachedGroqModels = null;
+let lastGroqFetchTime = 0;
+
 /**
- * Call Groq API (High Speed, 14,400 RPD Free Tier)
+ * Dynamically fetch active chat models from Groq API
+ * Refreshes cache every 1 hour (3600000 ms)
+ */
+async function getActiveGroqModels(openai) {
+  const now = Date.now();
+  if (cachedGroqModels && cachedGroqModels.length > 0 && (now - lastGroqFetchTime < 3600000)) {
+    return cachedGroqModels;
+  }
+
+  try {
+    const list = await openai.models.list();
+    const chatModels = list.data
+      .map(m => m.id)
+      .filter(id => !id.includes('whisper') && !id.includes('guard') && !id.includes('orpheus') && !id.includes('safeguard'));
+
+    // Prioritize high-performance conversational models
+    const sorted = chatModels.sort((a, b) => {
+      const getScore = (name) => {
+        if (name.includes('qwen')) return 3;
+        if (name.includes('gpt-oss')) return 2;
+        if (name.includes('llama')) return 1;
+        return 0;
+      };
+      return getScore(b) - getScore(a);
+    });
+
+    if (sorted.length > 0) {
+      cachedGroqModels = sorted;
+      lastGroqFetchTime = now;
+      console.log('🤖 [Groq Auto-Discovery]: Discovered active models:', cachedGroqModels);
+      return cachedGroqModels;
+    }
+  } catch (err) {
+    console.warn('⚠️ [Groq Auto-Discovery]: Could not fetch models dynamically, falling back to verified list:', err.message);
+  }
+
+  return ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
+}
+
+/**
+ * Call Groq API with Dynamic Model Auto-Discovery
  */
 async function callGroq({ prompt, systemInstruction, temperature }) {
   const apiKey = process.env.GROQ_API_KEY;
@@ -91,7 +135,7 @@ async function callGroq({ prompt, systemInstruction, temperature }) {
   }
 
   const openai = new OpenAI({ apiKey, baseURL: 'https://api.groq.com/openai/v1' });
-  const groqModels = ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'gemma2-9b-it'];
+  const groqModels = await getActiveGroqModels(openai);
 
   let lastErr;
   for (const model of groqModels) {
@@ -113,72 +157,74 @@ async function callGroq({ prompt, systemInstruction, temperature }) {
       });
     } catch (err) {
       lastErr = err;
-      const isQuotaOrLimit = err.message && (
+      const isRecoverableError = err.message && (
+        err.message.includes('400') ||
+        err.message.includes('404') ||
         err.message.includes('429') ||
         err.message.includes('Rate limit') ||
-        err.message.includes('tokens per minute')
+        err.message.includes('decommissioned') ||
+        err.message.includes('not exist')
       );
-      if (isQuotaOrLimit) {
-        console.warn(`🚨 [QUOTA / RATE LIMIT - Groq ${model}]: Switching to next Groq model...`);
+      if (isRecoverableError) {
+        console.warn(`🚨 [Groq Model Failed - ${model}]: ${err.message}. Trying next available model...`);
         continue;
       }
+      throw err;
     }
   }
 
-  // If ALL Groq models exhaust, fallback back to Gemini Ring!
-  console.warn('⚡ [ALL GROQ MODELS EXHAUSTED]: Falling back to Gemini AI Ring...');
-  return await callGeminiDirect({ prompt, systemInstruction, temperature });
+  throw lastErr || new Error('All discovered Groq models failed');
 }
 
 /**
- * Unified LLM Provider Service with 360-Degree Fallback Ring Loop:
- * Gemini (3 models) <---> Groq (3 models)
+ * Unified LLM Provider Service with Clean Fallback:
+ * If primary provider fails, attempts secondary provider without recursion
  */
-export async function callLLM({ prompt, systemInstruction = '', provider = process.env.DEFAULT_PROVIDER || 'gemini', temperature = 0.7 }) {
+export async function callLLM({ prompt, systemInstruction = '', provider = process.env.DEFAULT_PROVIDER || 'groq', temperature = 0.7 }) {
   const selectedProvider = provider.toLowerCase();
 
-  try {
-    if (selectedProvider === 'gemini') {
-      try {
-        return await callGeminiDirect({ prompt, systemInstruction, temperature });
-      } catch (geminiErr) {
-        if (process.env.GROQ_API_KEY) {
-          console.warn('⚡ [ALL GEMINI MODELS EXHAUSTED]: Switching to Groq AI 14,400 RPD Fallback Ring...');
-          return await callGroq({ prompt, systemInstruction, temperature });
-        }
-        throw geminiErr;
-      }
-    }
-
-    if (selectedProvider === 'groq') {
-      try {
-        return await callGroq({ prompt, systemInstruction, temperature });
-      } catch (groqErr) {
-        console.warn('⚡ [ALL GROQ MODELS EXHAUSTED]: Switching to Gemini AI Fallback Ring...');
+  // Try Groq as primary (or if selected)
+  if (selectedProvider === 'groq') {
+    try {
+      return await callGroq({ prompt, systemInstruction, temperature });
+    } catch (groqErr) {
+      console.warn('⚡ [Groq Unavailable]: Attempting fallback to Gemini...', groqErr.message);
+      if (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('your_')) {
         return await callGeminiDirect({ prompt, systemInstruction, temperature });
       }
+      throw groqErr;
     }
-
-    if (selectedProvider === 'openai') {
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey || apiKey.includes('your_')) {
-        throw new Error('OPENAI_API_KEY is not configured in backend/.env');
-      }
-      const openai = new OpenAI({ apiKey });
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
-          { role: 'user', content: prompt }
-        ],
-        temperature
-      });
-      return completion.choices[0]?.message?.content || '';
-    }
-
-    throw new Error(`Unsupported LLM provider: ${provider}`);
-  } catch (error) {
-    console.error(`❌ [LLM PROVIDER FATAL ERROR]: ${error.message}`);
-    throw error;
   }
+
+  // Try Gemini
+  if (selectedProvider === 'gemini') {
+    try {
+      return await callGeminiDirect({ prompt, systemInstruction, temperature });
+    } catch (geminiErr) {
+      console.warn('⚡ [Gemini Unavailable]: Attempting fallback to Groq Auto-Discovery...', geminiErr.message);
+      if (process.env.GROQ_API_KEY && !process.env.GROQ_API_KEY.includes('your_')) {
+        return await callGroq({ prompt, systemInstruction, temperature });
+      }
+      throw geminiErr;
+    }
+  }
+
+  if (selectedProvider === 'openai') {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey || apiKey.includes('your_')) {
+      throw new Error('OPENAI_API_KEY is not configured in backend/.env');
+    }
+    const openai = new OpenAI({ apiKey });
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+        { role: 'user', content: prompt }
+      ],
+      temperature
+    });
+    return completion.choices[0]?.message?.content || '';
+  }
+
+  throw new Error(`Unsupported LLM provider: ${provider}`);
 }

@@ -146,7 +146,7 @@ export default function ChatInput({
           ref={textareaRef}
           className="chat-input"
           rows={1}
-          placeholder={attachedFile ? "Ask Sabha.ai Council about this document..." : "Ask Sabha.ai Council anything..."}
+          placeholder={currentAttachedFiles.length > 0 ? "Ask Sabha.ai Council about attached files..." : "Ask Sabha.ai Council anything..."}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -167,7 +167,7 @@ export default function ChatInput({
           <button
             className="send-btn"
             onClick={onSend}
-            disabled={!input.trim() && !attachedFile}
+            disabled={!input.trim() && currentAttachedFiles.length === 0}
             style={{ alignSelf: 'flex-end', marginBottom: '4px' }}
           >
             <Send size={18} />

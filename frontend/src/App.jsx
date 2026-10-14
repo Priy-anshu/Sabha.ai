@@ -285,6 +285,10 @@ export default function App() {
             setActivePersonas(event.personas);
           }
 
+          if (event.type === 'error') {
+            throw new Error(event.error || 'Server error occurred during multi-agent thinking.');
+          }
+
           if (event.type === 'done') {
             isStreamFinished = true;
             setActivePersonas(event.personas);
@@ -316,7 +320,8 @@ export default function App() {
         // Fallback to standard request if stream didn't receive done event
         const debateData = await sendDebatePrompt({
           prompt: currentInput,
-          file: currentFile,
+          file: currentFiles[0] || null,
+          files: currentFiles,
           existingPersonas: activePersonas,
           behaviors: selectedBehaviors,
           sessionId,
@@ -350,9 +355,10 @@ export default function App() {
       if (err.name === 'AbortError') {
         console.log('Generation request cleanly aborted by user.');
       } else {
+        console.error('Debate Generation Error:', err);
         setMessages(prev => [
           ...prev,
-          { id: String(Date.now() + 1), sender: 'ai', text: 'Failed to connect to Sabha.ai backend debate service.' }
+          { id: String(Date.now() + 1), sender: 'ai', text: `Error: ${err.message || 'Failed to connect to Sabha.ai backend debate service.'}` }
         ]);
       }
     } finally {
