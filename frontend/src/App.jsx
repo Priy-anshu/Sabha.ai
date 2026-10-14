@@ -6,6 +6,7 @@ import ChatMessages from './components/ChatMessages.jsx';
 import ChatInput from './components/ChatInput.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import InspectionModal from './components/InspectionModal.jsx';
+import GuestNoticeModal from './components/GuestNoticeModal.jsx';
 import { getSessions, getSessionById, saveSession, deleteSession } from './api/sessionApi.js';
 import { sendDebatePrompt, sendDebatePromptStream } from './api/chatApi.js';
 import { useAuth } from './context/AuthContext.jsx';
@@ -23,6 +24,15 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [modalData, setModalData] = useState(null);
+  const [showGuestNotice, setShowGuestNotice] = useState(() => {
+    try {
+      const dismissed = localStorage.getItem('sabha_guest_notice_dismissed');
+      const seen = sessionStorage.getItem('sabha_guest_notice_seen');
+      return !dismissed && !seen;
+    } catch {
+      return true;
+    }
+  });
 
   // Instant Loading & Pagination States
   const [isSessionLoading, setIsSessionLoading] = useState(false);
@@ -456,6 +466,17 @@ export default function App() {
 
       {/* Persona Inspection & Debate Transcript Pop-Up Modal */}
       {modalData && <InspectionModal modalData={modalData} onClose={() => setModalData(null)} />}
+
+      {/* Guest Education Notice Pop-Up Modal */}
+      {!user && showGuestNotice && (
+        <GuestNoticeModal
+          onClose={() => setShowGuestNotice(false)}
+          onOpenAuthModal={() => {
+            setShowGuestNotice(false);
+            setShowAuthModal(true);
+          }}
+        />
+      )}
     </div>
   );
 }
