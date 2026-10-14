@@ -105,7 +105,7 @@ export default function App() {
       setSessions([]);
       setMessages([]);
       setActivePersonas([]);
-      setAttachedFiles(null);
+      setAttachedFiles([]);
       setInput('');
       setSelectedBehaviors([]);
       setModalData(null);
@@ -132,7 +132,7 @@ export default function App() {
     setActivePersonas([]);
     setLiveSteps([]);
     setActivePersona(null);
-    setAttachedFiles(null);
+    setAttachedFiles([]);
     setLoading(false);
     setIsSessionLoading(false);
     setHasMoreMessages(false);

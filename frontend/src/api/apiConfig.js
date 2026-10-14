@@ -13,17 +13,24 @@ export function getApiUrl(path) {
 
 export async function fetchWithAuth(url, options = {}) {
   const token = localStorage.getItem('token');
+  const validToken = token && token !== 'undefined' && token !== 'null' ? token : null;
   const fullUrl = getApiUrl(url);
 
   const headers = {
     ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    ...(validToken ? { Authorization: `Bearer ${validToken}` } : {})
   };
 
   const response = await fetch(fullUrl, {
     ...options,
     headers
   });
+
+  // Auto-clear invalid/expired credentials so the app does not remain locked in 401 loop
+  if (response.status === 401 && token) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  }
 
   return response;
 }
